@@ -2,8 +2,13 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
+import inquirer from "inquirer";
+import { select } from "@inquirer/prompts";
+import { GooLoader } from "./loaders/progress";
 
 const program = new Command();
+
+const loader = new GooLoader("green").start();
 
 function showError(message: string) {
   console.error(chalk.red.bold(`Error: ${message}`));
@@ -19,43 +24,70 @@ program
   .option("-t, --timeout <seconds>", "specify the timeout in seconds", "30")
   .option("-v, --verbose", "enable verbose output");
 
-program
-  .command("list")
-  .description("all list item")
-  .option("-a, --all", "list all items, including hidden ones")
-  .action((options) => {
-    console.log("working fine here", options);
-    if (options.all) {
-      console.log("inside all");
-    }
-  });
-
 const validType = ["default", "special", "custom"];
 
 program
-  .command("create <name>")
-  .description("create new item")
-  .option("-t, --type <type>", "specify the item type", "default")
-  .action((name, options) => {
-    console.log(name.length);
-    if (name.length < 3) {
-      console.error(
-        chalk.red("Error: The item name must be at least 3 characters long."),
-      );
-      process.exit(1);
-    }
+  .command("create")
+  .description("Create a new item with interactive input")
+  .action(async () => {
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "name",
+        message: "Enter the item name:",
+        validate: (input) =>
+          input.length >= 3
+            ? true
+            : "The name must be at least 3 characters long.",
+      },
+      {
+        type: "list",
+        name: "type",
+        message: "Select the item type:",
+        choices: ["default", "special", "custom"],
+      },
+    ]);
 
-    if (!validType.includes(options.type)) {
-      showError(
-        `Invalid type "${options.type}". Allowed types: ${validType.join(", ")}`,
-      );
-    }
     console.log(
       chalk.green(
-        `Successfully created item "${name}" of type "${options.type}"`,
+        `Successfully created item "${answers.name}" of type "${answers.type}"`,
       ),
     );
   });
+
+program.action(async () => {
+  const model = await select({
+    message: "Select a model",
+    choices: [
+      { name: "llama3", value: "llama3" },
+      { name: "qwen3", value: "qwen3" },
+      { name: "deepseek-r1", value: "deepseek-r1" },
+    ],
+  });
+
+  console.log(model);
+});
+
+program
+  .command("list")
+  .description("List all the available models")
+  .action(async () => {
+    const model = await select({
+      message: "Choose a model",
+      choices: [
+        {
+          name: "Llama 3",
+          value: "llama3",
+        },
+        {
+          name: "Qwen 3",
+          value: "qwen3",
+        },
+      ],
+    });
+    console.log(model);
+  });
+
 program.parse();
 
 const options = program.opts();
