@@ -5,10 +5,18 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import { select } from "@inquirer/prompts";
 import { GooLoader } from "./loaders/progress";
+import { printWelcome } from "./loaders/frontLoader";
 
 const program = new Command();
 
-const loader = new GooLoader("green").start();
+printWelcome({
+  appName: "Goo CLI",
+  version: "v0.1.0",
+  line1Label: "Signed in with",
+  line1Hint: "/auth",
+  line2Label: "Model:",
+  line2Hint: "/upgrade",
+});
 
 function showError(message: string) {
   console.error(chalk.red.bold(`Error: ${message}`));

@@ -1,4 +1,4 @@
-const HIDE = "\x2b[?25l";
+const HIDE = "\x1b[?25l";
 const SHOW = "\x1b[?25h";
 const RESET = "\x1b[0m";
 const CLEAR_LINE = "\x1b[2K\r";
@@ -11,14 +11,9 @@ const PALETTE = {
 } as const;
 
 type Color = keyof typeof PALETTE;
+const TRACK = 13;
 
-// Snake crawls across a tiny 16-cell track, leaving a fading tail
-// The "Goo" text is rendered as ghost-dots on the track that light up when covered
-const TRACK = 16;
-
-// Goo encoded as which positions in the 16-cell track are "lit" letters
-// G=0..3, o=5..8, o=10..13  (each letter is 4 cells wide, 1 gap)
-const LETTER_CELLS = new Set([0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13]);
+const LETTER_CELLS = new Set([1, 2, 3, 4, 7, 8, 9, 10]);
 
 const FRAMES_PER_TICK = 1;
 const SNAKE_LEN = 4;
