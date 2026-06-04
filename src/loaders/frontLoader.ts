@@ -33,7 +33,7 @@ const THEMES: Record<
   },
 };
 
-function pickTheme(): LogoTheme {
+function pickTheme(): LogoTheme | undefined {
   const themes: LogoTheme[] = ["green", "amber", "cyan"];
   return themes[Math.floor(Math.random() * themes.length)];
 }
