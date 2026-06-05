@@ -3,20 +3,20 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { select } from "@inquirer/prompts";
-import { GooLoader } from "./loaders/progress";
-import { printWelcome } from "./loaders/frontLoader";
+import { select, editor } from "@inquirer/prompts";
+import { listOllamaModels } from "./ollama/client";
+import { colorMap, pickTheme } from "./utils/Color";
 
 const program = new Command();
 
-printWelcome({
-  appName: "Goo CLI",
-  version: "v0.1.0",
-  line1Label: "Signed in with",
-  line1Hint: "/auth",
-  line2Label: "Model:",
-  line2Hint: "/upgrade",
-});
+// printWelcome({
+//   appName: "Goo CLI",
+//   version: "v0.1.0",
+//   line1Label: "Signed in with",
+//   line1Hint: "/auth",
+//   line2Label: "Model:",
+//   line2Hint: "/upgrade",
+// });
 
 function showError(message: string) {
   console.error(chalk.red.bold(`Error: ${message}`));
@@ -64,36 +64,50 @@ program
   });
 
 program.action(async () => {
-  const model = await select({
-    message: "Select a model",
-    choices: [
-      { name: "llama3", value: "llama3" },
-      { name: "qwen3", value: "qwen3" },
-      { name: "deepseek-r1", value: "deepseek-r1" },
-    ],
-  });
+  const ollamaModels = await listOllamaModels();
 
-  console.log(model);
+  if (ollamaModels == undefined) {
+    await editor({
+      message: "No model yet",
+      theme: {
+        prefix: {
+          symbol: "🎨",
+          color: "cyan",
+        },
+      },
+    });
+    return;
+  }
+
+  const color = pickTheme();
+  const themeColor = colorMap[color];
+
+  await select({
+    message: themeColor("Select a model"),
+    choices: ollamaModels?.map((m) => ({
+      name: `${themeColor("●")} ${m.name}`,
+      value: m.value,
+    })),
+  });
 });
 
 program
   .command("list")
   .description("List all the available models")
   .action(async () => {
+    const ollamaModels = await listOllamaModels();
+
+    if (ollamaModels == undefined) {
+      return;
+    }
+
     const model = await select({
       message: "Choose a model",
-      choices: [
-        {
-          name: "Llama 3",
-          value: "llama3",
-        },
-        {
-          name: "Qwen 3",
-          value: "qwen3",
-        },
-      ],
+      choices: ollamaModels.map((m) => ({
+        name: `${m.name}`,
+        value: m.name,
+      })),
     });
-    console.log(model);
   });
 
 program.parse();
