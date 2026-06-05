@@ -6,17 +6,18 @@ import inquirer from "inquirer";
 import { select, editor } from "@inquirer/prompts";
 import { listOllamaModels } from "./ollama/client";
 import { colorMap, pickTheme } from "./utils/Color";
+import { printWelcome } from "./loaders/frontLoader";
 
 const program = new Command();
 
-// printWelcome({
-//   appName: "Goo CLI",
-//   version: "v0.1.0",
-//   line1Label: "Signed in with",
-//   line1Hint: "/auth",
-//   line2Label: "Model:",
-//   line2Hint: "/upgrade",
-// });
+printWelcome({
+  appName: "Goo CLI",
+  version: "v0.1.0",
+  line1Label: "Signed in with",
+  line1Hint: "/auth",
+  line2Label: "Model:",
+  line2Hint: "/upgrade",
+});
 
 function showError(message: string) {
   console.error(chalk.red.bold(`Error: ${message}`));
@@ -71,7 +72,6 @@ program.action(async () => {
       message: "No model yet",
       theme: {
         prefix: {
-          symbol: "🎨",
           color: "cyan",
         },
       },
@@ -79,8 +79,8 @@ program.action(async () => {
     return;
   }
 
-  const color = pickTheme();
-  const themeColor = colorMap[color];
+  const color = pickTheme() as keyof typeof colorMap;
+  const themeColor = colorMap[color]!;
 
   await select({
     message: themeColor("Select a model"),

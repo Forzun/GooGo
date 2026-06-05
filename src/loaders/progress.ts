@@ -11,15 +11,12 @@ const PALETTE = {
 } as const;
 
 type Color = keyof typeof PALETTE;
+
 const TRACK = 13;
-
 const LETTER_CELLS = new Set([1, 2, 3, 4, 7, 8, 9, 10]);
-
-const FRAMES_PER_TICK = 1;
-const SNAKE_LEN = 4;
+const SNAKE_LEN = 5;
 const TAIL_CHARS = ["█", "▓", "▒", "░"];
-
-const LABELS = ["loading", "fetching", "connecting", "please wait"];
+const DEFAULT_LABELS = ["loading", "fetching", "connecting", "please wait"];
 
 export class GooLoader {
   private pos = 0;
@@ -33,15 +30,35 @@ export class GooLoader {
   private dotFrame = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private firstFrame = true;
+  private labels: string[];
+  private customLabel: string | null = null; // ← holds setLabel() override
 
-  constructor(private color: Color = "green") {}
+  constructor(private color: Color = "green") {
+    this.labels = [...DEFAULT_LABELS];
+  }
+
+  // ── public API ────────────────────────────────────────────────────────────
+
+  /** Override the label text shown next to the animation */
+  setLabel(text: string) {
+    this.customLabel = text;
+  }
+
+  /** Clear the custom label and go back to cycling defaults */
+  clearLabel() {
+    this.customLabel = null;
+  }
+
+  // ── internal ──────────────────────────────────────────────────────────────
 
   private tick() {
     if (this.phase === "pause") {
       if (--this.pauseTick <= 0) {
         this.phase = "uncovering";
         this.uncoverQueue = [...this.covered].sort(() => Math.random() - 0.5);
-        this.labelIdx = (this.labelIdx + 1) % LABELS.length;
+        if (!this.customLabel) {
+          this.labelIdx = (this.labelIdx + 1) % this.labels.length;
+        }
       }
       return;
     }
@@ -59,11 +76,9 @@ export class GooLoader {
       return;
     }
 
-    // move snake
     this.tail = [this.pos, ...this.tail].slice(0, SNAKE_LEN - 1);
     this.pos += this.direction;
 
-    // bounce at edges
     if (this.pos >= TRACK) {
       this.pos = TRACK - 2;
       this.direction = -1;
@@ -73,10 +88,8 @@ export class GooLoader {
       this.direction = 1;
     }
 
-    // cover letter cells
     if (LETTER_CELLS.has(this.pos)) this.covered.add(this.pos);
 
-    // check if all letters covered
     const allCovered = [...LETTER_CELLS].every((c) => this.covered.has(c));
     if (allCovered) {
       this.phase = "pause";
@@ -107,10 +120,13 @@ export class GooLoader {
       }
     }
 
-    const dots = ".".repeat(Math.floor(this.dotFrame / 20) + 1);
-    const label = LABELS[this.labelIdx];
+    // use customLabel if set, otherwise cycle through defaults
+    const label = this.customLabel ?? this.labels[this.labelIdx];
+    const dots = this.customLabel
+      ? "" // no animated dots when showing custom text (e.g. "downloading 42%")
+      : ".".repeat(Math.floor(this.dotFrame / 20) + 1).padEnd(3);
 
-    const line = `  ${color}⠿${RESET} ${track}  ${MUTED}${label}${dots.padEnd(3)}${RESET}`;
+    const line = `  ${color}⠿${RESET} ${track}  ${MUTED}${label}${dots}${RESET}`;
 
     if (this.firstFrame) {
       process.stdout.write(line);
@@ -153,7 +169,6 @@ if (import.meta.main) {
   setTimeout(() => {
     loader.stop("models loaded");
   }, 5000);
-
   process.on("SIGINT", () => {
     loader.stop();
     process.exit(0);
