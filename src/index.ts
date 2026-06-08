@@ -7,6 +7,7 @@ import { select, editor } from "@inquirer/prompts";
 import { listOllamaModels } from "./ollama/client";
 import { colorMap, pickTheme } from "./utils/Color";
 import { printWelcome } from "./loaders/frontLoader";
+import { chatCommand } from "./commands/chat";
 
 const program = new Command();
 
@@ -34,6 +35,8 @@ program
   .option("-v, --verbose", "enable verbose output");
 
 const validType = ["default", "special", "custom"];
+
+program.addCommand(chatCommand());
 
 program
   .command("create")
@@ -111,6 +114,10 @@ program
   });
 
 program.parse();
+
+if (process.argv.length === 2) {
+  process.argv.push("chat");
+}
 
 const options = program.opts();
 if (options.debug) {
