@@ -1,231 +1,255 @@
 import type { Message } from "ollama/dist/browser.cjs";
+import { execSync } from "child_process";
 
+// ── ANSI ──────────────────────────────────────────────────────────────────────
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const WHITE = "\x1b[38;2;220;218;210m";
-const MUTED = "\x1b[38;2;90;88;80m";
-const GREEN = "\x1b[38;2;63;185;80m";
-const BLUE = "\x1b[38;2;100;160;255m";
-const RED = "\x1b[38;2;220;80;80m";
-const YELLOW = "\x1b[38;2;200;160;60m";
 const HIDE = "\x1b[?25l";
 const SHOW = "\x1b[?25h";
-const CLR = "\x1b[2K\r";
-const UP = (n: number) => `\x1b[${n}A`;
-const COL = (n: number) => `\x1b[${n}G`;
 
-function cols() {
-  return process.stdout.columns ?? 80;
-}
-function rows() {
-  return process.stdout.rows ?? 24;
+const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
+const bg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
+
+const TEXT = fg(220, 218, 210);
+const MUTED = fg(80, 78, 72);
+const SUBTLE = fg(55, 53, 48);
+const WARN = fg(192, 112, 64);
+const OK = fg(106, 154, 106);
+const HINT = fg(85, 120, 85);
+const BORDER = fg(55, 53, 48); // box border color
+const INPUT_BG = bg(28, 27, 24); // slightly lighter than terminal bg
+
+const cols = () => process.stdout.columns ?? 80;
+const w = (s: string) => process.stdout.write(s);
+
+// ── Git branch ────────────────────────────────────────────────────────────────
+function gitBranch(): string {
+  try {
+    return (
+      execSync("git rev-parse --abbrev-ref HEAD 2>/dev/null", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() || "main"
+    );
+  } catch {
+    return "main";
+  }
 }
 
-// ── full-width divider ────────────────────────────────────────────────────────
-function divider() {
-  return `${MUTED}${"─".repeat(cols())}${R}`;
+// ── Header (printed once) ─────────────────────────────────────────────────────
+function printHeader(model: string, sandbox = false, quotaPct = 0) {
+  const cwd = process.cwd().replace(process.env.HOME ?? "", "~");
+  const branch = gitBranch();
+  const C = cols();
+
+  // top-right hint
+  const hint = "? for shortcuts";
+  w(" ".repeat(Math.max(0, C - hint.length - 1)) + MUTED + hint + R + "\n");
+
+  // shift+tab hint
+  w(HINT + "Shift+Tab to accept edits" + R + "\n");
+
+  w("\n");
+
+  // status labels
+  const widths = [28, 10, 14, 26, 0];
+  const labels = [
+    "workspace (/directory)",
+    "branch",
+    "sandbox",
+    "/model",
+    "quota",
+  ];
+  w("  ");
+  labels.forEach((l, i) => w(MUTED + l.padEnd(widths[i]) + R));
+  w("\n");
+
+  // status values
+  const sandboxClr = sandbox ? OK : WARN;
+  const sandboxStr = sandbox ? "sandbox" : "no sandbox";
+  w("  ");
+  w(TEXT + cwd.padEnd(widths[0]) + R);
+  w(TEXT + branch.padEnd(widths[1]) + R);
+  w(sandboxClr + sandboxStr.padEnd(widths[2]) + R);
+  w(TEXT + model.padEnd(widths[3]) + R);
+  w(OK + quotaPct + "% used" + R);
+  w("\n");
 }
 
-// ── header (top 3 lines, like gemini) ────────────────────────────────────────
-function printHeader(model: string) {
-  const hint = `${MUTED}? for shortcuts${R}`;
-  const hintLen = "? for shortcuts".length;
-  const pad = cols() - hintLen - 1;
-  process.stdout.write("\n");
-  process.stdout.write(" ".repeat(pad) + hint + "\n");
-  process.stdout.write("\n");
-  process.stdout.write(`  ${MUTED}Shift+Tab to accept edits${R}\n`);
-  process.stdout.write("\n");
-}
-
-// ── AI response ───────────────────────────────────────────────────────────────
+// ── Output helpers ────────────────────────────────────────────────────────────
 function printAI(content: string) {
-  process.stdout.write("\n");
-  content.split("\n").forEach((l) => {
-    process.stdout.write(`  ${WHITE}${l}${R}\n`);
-  });
-  process.stdout.write("\n");
+  w("\n");
+  content.split("\n").forEach((l) => w("  " + TEXT + l + R + "\n"));
+  w("\n");
 }
 
-function printInfo(text: string) {
-  process.stdout.write(`\n  ${MUTED}${text}${R}\n\n`);
+function printInfo(
+  text: string,
+  kind: "default" | "success" | "error" = "default",
+) {
+  const c = kind === "success" ? OK : kind === "error" ? WARN : MUTED;
+  w("\n  " + c + text + R + "\n\n");
 }
 
 function printHelp() {
-  const cmds = [
+  const rows: [string, string][] = [
+    ["/help", "show this help"],
     ["/clear", "clear conversation history"],
     ["/history", "show message history"],
     ["/model", "show current model"],
     ["/exit", "quit"],
   ];
-  process.stdout.write("\n");
-  cmds.forEach(([cmd, desc]) => {
-    process.stdout.write(
-      `  ${GREEN}${cmd.padEnd(12)}${R}${MUTED}${desc}${R}\n`,
-    );
-  });
-  process.stdout.write("\n");
+  w("\n");
+  rows.forEach(([cmd, desc]) =>
+    w("  " + BOLD + TEXT + cmd.padEnd(12) + R + "  " + MUTED + desc + R + "\n"),
+  );
+  w("\n");
 }
 
-// ── bottom status bar (gemini style) ─────────────────────────────────────────
-// workspace (/directory)   branch   sandbox   /model        quota
-function drawStatusBar(model: string, cwd: string, branch = "main") {
-  const width = cols();
-  const wspace = cwd.replace(process.env.HOME ?? "", "~");
-  const sandbox = `${RED}no sandbox${R}`;
-  const sandboxLen = "no sandbox".length;
-  const modelStr = `${MUTED}/${model}${R}`;
-  const modelLen = model.length + 1;
-  const quota = `${GREEN}0% used${R}`;
-  const quotaLen = "0% used".length;
+// ── Bordered input box ────────────────────────────────────────────────────────
+//
+//  ╭──────────────────────────────────────────────────────────────╮
+//  │  > █                                                         │
+//  ╰──────────────────────────────────────────────────────────────╯
+//
+// Strategy:
+//   1. Draw all 3 lines once.
+//   2. Move cursor UP 2 to sit on the middle line (col 1).
+//   3. Every keypress: \r + rewrite middle line (no UP/DOWN ever again).
+//   4. On Enter: move DOWN 2 to land below the box cleanly.
 
-  // row 1: column headers
-  const h1 = `workspace (/directory)`;
-  const h2 = `branch`;
-  const h3 = `sandbox`;
-  const h4 = `/model`;
-  const h5 = `quota`;
+const CORNER_TL = "╭";
+const CORNER_TR = "╮";
+const CORNER_BL = "╰";
+const CORNER_BR = "╯";
+const HORIZ = "─";
+const VERT = "│";
 
-  const c1 = 0,
-    c2 = 24,
-    c3 = 32,
-    c4 = 42,
-    c5 = width - quotaLen - 2;
+// The middle line content (no trailing newline)
+// "  │  > VALUE<pad>  │"
+// Visible prefix = "  │  > " = 7 chars
+const MID_PREFIX_VIS = 7; // "  │  > "
+const MID_SUFFIX_VIS = 3; // "  │"  (space+space+│ at end... actually "  │")
 
-  let headerRow = "";
-  headerRow += " ".repeat(2) + `${MUTED}${h1}${R}`;
-  headerRow += " ".repeat(c2 - 2 - h1.length) + `${MUTED}${h2}${R}`;
-  headerRow += " ".repeat(c3 - c2 - h2.length) + `${MUTED}${h3}${R}`;
-  headerRow += " ".repeat(c4 - c3 - h3.length) + `${MUTED}${h4}${R}`;
-  const afterH4 = c4 + h4.length;
-  headerRow += " ".repeat(Math.max(1, c5 - afterH4)) + `${MUTED}${h5}${R}`;
+function midLine(value: string): string {
+  const inner = cols() - 4; // between ╭ and ╮  (2 spaces indent each side)
+  const maxVal = inner - MID_PREFIX_VIS - MID_SUFFIX_VIS + 2;
+  const display = value.slice(-maxVal);
+  const pad = Math.max(0, inner - MID_PREFIX_VIS - display.length - 2);
 
-  // row 2: values
-  const v1 = wspace;
-  const v2 = "main";
-  const v3len = sandboxLen;
-
-  let valRow = "";
-  valRow += " ".repeat(2) + `${WHITE}${v1}${R}`;
-  valRow += " ".repeat(Math.max(1, c2 - 2 - v1.length)) + `${WHITE}${v2}${R}`;
-  valRow += " ".repeat(Math.max(1, c3 - c2 - v2.length)) + sandbox;
-  valRow += " ".repeat(Math.max(1, c4 - c3 - v3len)) + modelStr;
-  const afterV4 = c4 + modelLen;
-  valRow += " ".repeat(Math.max(1, c5 - afterV4)) + quota;
-
-  process.stdout.write(divider() + "\n");
-  process.stdout.write(headerRow + "\n");
-  process.stdout.write(valRow + "\n");
+  return (
+    "  " +
+    BORDER +
+    VERT +
+    R +
+    INPUT_BG +
+    "  > " +
+    TEXT +
+    display +
+    R +
+    INPUT_BG +
+    " ".repeat(pad) +
+    R +
+    BORDER +
+    "  " +
+    VERT +
+    R
+  );
 }
 
-// ── input bar (gemini style: "> " prompt, placeholder, no box) ───────────────
-// Renders 2 lines:
-//   (blank line)
-//   > |Type your message or @path/to/file
-// We draw it, then move cursor back to the › position for raw typing.
-
-const PLACEHOLDER = "Type your message or @path/to/file";
-
-function drawInputBar(value: string) {
-  const placeholder =
-    value.length === 0 ? `${MUTED}${PLACEHOLDER}${R}` : `${WHITE}${value}${R}`;
-  process.stdout.write(`\n`);
-  process.stdout.write(`  ${GREEN}${BOLD}>${R} ${placeholder}\n`);
+function drawBox(value: string) {
+  const inner = cols() - 4;
+  const h = HORIZ.repeat(inner);
+  w("  " + BORDER + CORNER_TL + h + CORNER_TR + R + "\n");
+  w(midLine(value) + "\n");
+  w("  " + BORDER + CORNER_BL + h + CORNER_BR + R + "\n");
 }
 
-function redrawInputLine(value: string) {
-  // clear current line and redraw
-  process.stdout.write(CLR);
-  const placeholder =
-    value.length === 0 ? `${MUTED}${PLACEHOLDER}${R}` : `${WHITE}${value}${R}`;
-  process.stdout.write(`  ${GREEN}${BOLD}>${R} ${placeholder}`);
-  // reposition cursor after "> " + value
-  const cursorPos = 5 + value.length; // "  > " = 4 + 1 space
-  process.stdout.write(COL(cursorPos + 1));
-}
-
-// ── raw input reader ──────────────────────────────────────────────────────────
-function readInput(): Promise<string> {
+function readLine(): Promise<string> {
   return new Promise((resolve) => {
     let value = "";
 
-    // draw the input bar
-    drawInputBar(value);
-    // cursor is now on the input line, after placeholder
-    // move cursor to after "> "
-    process.stdout.write(UP(1));
-    process.stdout.write(COL(6));
-    process.stdout.write(SHOW);
+    // Draw box — cursor ends up below bottom border line
+    drawBox(value);
+
+    // Go up 2 lines → land on middle line (col 1 implicitly via \r in redraws)
+    w("\x1b[2A" + SHOW);
 
     process.stdin.setRawMode(true);
     process.stdin.resume();
     process.stdin.setEncoding("utf8");
 
+    const cleanup = () => {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdin.removeListener("data", onData);
+    };
+
+    // Redraw only the middle line in place
+    const redraw = () => {
+      w("\r\x1b[K" + midLine(value));
+    };
+
     const onData = (key: string) => {
       if (key === "\r" || key === "\n") {
-        process.stdin.setRawMode(false);
-        process.stdin.pause();
-        process.stdin.removeListener("data", onData);
-        process.stdout.write("\n");
-        process.stdout.write(HIDE);
+        // Move down 2 (past bottom border) then newline
+        w("\x1b[2B\n" + HIDE);
+        cleanup();
         resolve(value);
-        return;
-      }
-      if (key === "\x03") {
-        process.stdin.setRawMode(false);
-        process.stdin.pause();
-        process.stdin.removeListener("data", onData);
-        process.stdout.write("\n");
+      } else if (key === "\x03") {
+        w("\x1b[2B\n");
+        cleanup();
         resolve("/exit");
-        return;
-      }
-      if (key === "\x7f" || key === "\b") {
+      } else if (key === "\x7f" || key === "\b") {
+        if (value.length === 0) return;
         value = value.slice(0, -1);
+        redraw();
       } else if (key.charCodeAt(0) >= 32) {
         value += key;
+        redraw();
       }
-      redrawInputLine(value);
     };
 
     process.stdin.on("data", onData);
   });
 }
 
-// ── main ──────────────────────────────────────────────────────────────────────
+// ── Main loop ─────────────────────────────────────────────────────────────────
 export async function startChat(model: string) {
   const history: Message[] = [];
-  const cwd = process.cwd();
 
-  process.stdout.write(HIDE);
+  w(HIDE);
   printHeader(model);
+  w("\n");
 
   process.on("SIGINT", () => {
-    process.stdout.write(SHOW + "\n");
+    w(SHOW + "\n");
+    printInfo("Goodbye 👋", "success");
     process.exit(0);
   });
 
   while (true) {
-    // draw status bar above input on each loop
-    drawStatusBar(model, cwd);
+    const raw = await readLine();
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      w("\n");
+      continue;
+    }
 
-    const userInput = await readInput();
-    const trimmed = userInput.trim();
-    if (!trimmed) continue;
-
-    if (trimmed === "?" || trimmed === "/help") {
+    if (trimmed === "/help" || trimmed === "?") {
       printHelp();
       continue;
     }
 
     if (trimmed === "/exit" || trimmed === "/quit") {
-      process.stdout.write(SHOW + "\n");
+      printInfo("Goodbye 👋", "success");
+      w(SHOW);
       break;
     }
 
     if (trimmed === "/clear") {
       history.length = 0;
-      printInfo("✓  Conversation cleared.");
+      printInfo("✓  Conversation cleared.", "success");
       continue;
     }
 
@@ -233,16 +257,26 @@ export async function startChat(model: string) {
       if (!history.length) {
         printInfo("No history yet.");
       } else {
-        process.stdout.write("\n");
+        w("\n");
         history.forEach((m, i) => {
-          const label = m.role === "user" ? `${GREEN}you${R}` : `${BLUE}ai${R}`;
+          const lbl = m.role === "user" ? OK + "you" + R : TEXT + "ai" + R;
           const preview =
             m.content.slice(0, 72) + (m.content.length > 72 ? "…" : "");
-          process.stdout.write(
-            `  ${MUTED}${String(i + 1).padStart(2)}.${R} ${label}  ${MUTED}${preview}${R}\n`,
+          w(
+            "  " +
+              MUTED +
+              String(i + 1).padStart(2) +
+              ". " +
+              R +
+              lbl +
+              "  " +
+              MUTED +
+              preview +
+              R +
+              "\n",
           );
         });
-        process.stdout.write("\n");
+        w("\n");
       }
       continue;
     }
@@ -252,9 +286,12 @@ export async function startChat(model: string) {
       continue;
     }
 
-    history.push({ role: "user", content: trimmed });
+    if (trimmed.startsWith("/")) {
+      printInfo(`Unknown command: ${trimmed}  ·  try /help`, "error");
+      continue;
+    }
 
-    // ── replace with real ollama streaming call ───────────────────────────
+    history.push({ role: "user", content: trimmed });
     printAI("Echo: " + trimmed);
     history.push({ role: "assistant", content: "Echo: " + trimmed });
   }
