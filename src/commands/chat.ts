@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { input } from "@inquirer/prompts";
 import chalk from "chalk";
-import { type Message } from "./providers/type";
+import { type Message } from "../providers/type";
 
 export function chatCommand(): Command {
   return new Command()
@@ -11,65 +11,74 @@ export function chatCommand(): Command {
     .option("-s, --system <s>", "Set a system prompt")
     .option("--no-stream", "Disable streaming")
     .action(async (opts) => {
-      const response = await input({
-        message: "write Something",
-      });
-
       const history: Message[] = [];
-      if (opts.system) history.push({ role: "system", content: "" });
 
-      const prompt = () => process.stdout.write(chalk.green("Your ->: "));
+      if (opts.system) {
+        console.log(
+          chalk.cyan(
+            "🤖 Chat started. Type /help for commands, /exit to quit.\n",
+          ),
+        );
+      }
 
-      for await (const line of console) {
-        const input = (line as string).trim();
+      while (true) {
+        const userInput = await input({
+          message: chalk.green("You ->"),
+        });
 
-        if (!input) {
-          prompt();
-          continue;
+        const message = userInput.trim();
+
+        if (!message) continue;
+
+        if (message === "/exit" || message === "/quit") {
+          console.log(chalk.gray("/nGoodbye! "));
+          break;
         }
 
-        if (input === "/exit" || input === "/quit") {
-          console.log(chalk.gray("\nGoodbye! 👋"));
-          process.exit(0);
-        }
-        if (input === "/clear") {
+        if (message === "/clear") {
           history.length = 0;
-          if (opts.system)
+          if (opts.system) {
             history.push({ role: "system", content: opts.system });
-          console.log(chalk.gray("  ✓ Conversation cleared.\n"));
-          prompt();
+          }
+          console.log(chalk.gray("   ✓ Conversation cleared.\n"));
           continue;
         }
 
-        if (input === "/history") {
-          if (!history.length) console.log(chalk.gray("  No history yet."));
-          else {
+        if (message === "/history") {
+          if (!history) {
+            console.log(chalk.gray("  No history yet."));
+          } else {
             history.forEach((m, i) => {
-              const r =
-                m.role === "user" ? chalk.green("You") : chalk.blue("AI");
-              console.log(
-                `${i + 1}. ${r} ${m.content.slice(0, 80)} ${m.content.length > 80 ? "..." : ""}`,
-              );
+              const label =
+                m.role === "user"
+                  ? chalk.green("You")
+                  : m.role === "system"
+                    ? chalk.yellow("Sys")
+                    : chalk.blue("Ai");
+
+              const preview =
+                m.content.slice(0, 80) + (m.content.length > 80 ? "..." : "");
+              console.log(` ${i + 1}. ${label}: ${preview}`);
             });
           }
-          prompt();
           continue;
         }
 
-        if (input === "/help") {
+        if (message === "/help") {
           console.log(
             chalk.gray(`
-              /clear    Clear conversation history
-              /history  Show message history
-              /exit     Quit the CLI
-              /help     Show this help
-              `),
+            Commands:
+            /clear    Clear conversation history
+            /history  Show message history
+            /exit     Quit the CLI
+            /help     Show this help
+            `),
           );
-          prompt();
           continue;
         }
 
-        history.push({ role: "user", content: input });
+        history.push({ role: "user", content: message });
+        console.log(chalk.blue("AI ->:"), "Echo: " + message);
       }
     });
 }

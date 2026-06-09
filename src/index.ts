@@ -20,11 +20,6 @@ printWelcome({
   line2Hint: "/upgrade",
 });
 
-function showError(message: string) {
-  console.error(chalk.red.bold(`Error: ${message}`));
-  process.exit(1);
-}
-
 program
   .name("ai")
   .description("A CLI application built with Commander.js")
