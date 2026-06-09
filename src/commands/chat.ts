@@ -72,6 +72,7 @@ export function chatCommand(): Command {
             /history  Show message history
             /exit     Quit the CLI
             /help     Show this help
+            /list     To show all models
             `),
           );
           continue;
