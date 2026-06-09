@@ -55,7 +55,7 @@ program.action(async () => {
   });
   console.log(chalk.gray(`\nUsing model: ${selectedModel}\n`));
 
-  await startChat(selectedModel);
+  await startChat(selectedModel, color);
 });
 
 program.parse();

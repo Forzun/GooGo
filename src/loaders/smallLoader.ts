@@ -4,6 +4,9 @@ const CLEAR = "\r\x1b[2K";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+const ZINC = "\x1b[38;2;161;161;170m";
+const RESET = "\x1b[0m";
+
 export class GooLoader {
   private timer: NodeJS.Timeout | null = null;
   private frame = 0;
@@ -19,7 +22,7 @@ export class GooLoader {
     this.timer = setInterval(() => {
       const spinner = FRAMES[this.frame % FRAMES.length];
 
-      process.stdout.write(`${CLEAR}${spinner} Goo ${this.text}...`);
+      process.stdout.write(`${CLEAR}${ZINC}${spinner}${RESET} Goo ${this.text}...`);
 
       this.frame++;
     }, 80);

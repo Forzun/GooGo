@@ -101,8 +101,8 @@ export class GooLoader {
 
   private render() {
     const color = PALETTE[this.color];
-    const DIM = "\x1b[38;2;45;50;45m";
-    const MUTED = "\x1b[38;2;80;80;80m";
+    const DIM = "\x1b[38;2;63;63;70m"; // zinc-700
+    const MUTED = "\x1b[38;2;113;113;122m"; // zinc-500
 
     let track = "";
     for (let i = 0; i < TRACK; i++) {

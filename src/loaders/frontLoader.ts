@@ -4,11 +4,11 @@ const DIM = "\x1b[2m";
 
 const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
 
-const TITLE = fg(240, 238, 230);
-const LABEL = fg(140, 138, 130);
-const VALUE = fg(210, 208, 200);
-const HINT = fg(90, 88, 82);
-const DIVIDER = fg(70, 68, 62);
+const TITLE = fg(250, 250, 251); // zinc-50
+const LABEL = fg(161, 161, 170); // zinc-400
+const VALUE = fg(228, 228, 231); // zinc-200
+const HINT = fg(113, 113, 122); // zinc-500
+const DIVIDER = fg(63, 63, 70); // zinc-700
 
 type LogoTheme = "green" | "amber" | "cyan";
 

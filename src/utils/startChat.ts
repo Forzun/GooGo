@@ -6,23 +6,29 @@ const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const HIDE = "\x1b[?25l";
 const SHOW = "\x1b[?25h";
+const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
 const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
 const bg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
 
-const TEXT = fg(220, 218, 210);
-const MUTED = fg(80, 78, 72);
-const SUBTLE = fg(55, 53, 48);
-const WARN = fg(192, 112, 64);
-const OK = fg(106, 154, 106);
-const HINT = fg(85, 120, 85);
-const BORDER = fg(55, 53, 48); // box border color
-const INPUT_BG = bg(28, 27, 24); // slightly lighter than terminal bg
+const TEXT = fg(228, 228, 231);
+const MUTED = fg(161, 161, 170);
+const DIM = fg(113, 113, 122);
+const WARN = fg(251, 146, 60);
+const OK = fg(134, 239, 172);
+const HINT = fg(74, 222, 128);
+const BOX_BG = bg(52, 52, 58);
+
+const THEME_COLORS: Record<string, string> = {
+  zinc: fg(212, 212, 216),
+  green: fg(134, 239, 172),
+  amber: fg(252, 211, 77),
+  cyan: fg(103, 232, 249),
+};
 
 const cols = () => process.stdout.columns ?? 80;
 const w = (s: string) => process.stdout.write(s);
 
-// ── Git branch ────────────────────────────────────────────────────────────────
 function gitBranch(): string {
   try {
     return (
@@ -36,144 +42,137 @@ function gitBranch(): string {
   }
 }
 
-// ── Header (printed once) ─────────────────────────────────────────────────────
-function printHeader(model: string, sandbox = false, quotaPct = 0) {
+interface UIState {
+  model: string;
+  theme: string;
+  sandbox: boolean;
+  quotaPct: number;
+  messages: { role: "user" | "assistant"; content: string }[];
+}
+
+// ── Repaint ───────────────────────────────────────────────────────────────────
+function repaint(state: UIState) {
+  const { model, theme, sandbox, quotaPct, messages } = state;
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~");
   const branch = gitBranch();
   const C = cols();
+  const accent = THEME_COLORS[theme] ?? MUTED;
+
+  w(CLEAR_SCREEN);
 
   // top-right hint
   const hint = "? for shortcuts";
-  w(" ".repeat(Math.max(0, C - hint.length - 1)) + MUTED + hint + R + "\n");
+  w(" ".repeat(Math.max(0, C - hint.length - 1)) + DIM + hint + R + "\n");
 
-  // shift+tab hint
+  // shift+tab
   w(HINT + "Shift+Tab to accept edits" + R + "\n");
+
+  // messages
+  if (messages.length > 0) {
+    w("\n");
+    messages.slice(-30).forEach((m) => {
+      if (m.role === "user") {
+        w(MUTED + " you  " + R + TEXT + m.content + R + "\n");
+      } else {
+        w("\n");
+        m.content.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
+        w("\n");
+      }
+    });
+  }
 
   w("\n");
 
   // status labels
   const widths = [28, 10, 14, 26, 0];
-  const labels = [
-    "workspace (/directory)",
-    "branch",
-    "sandbox",
-    "/model",
-    "quota",
-  ];
-  w("  ");
-  labels.forEach((l, i) => w(MUTED + l.padEnd(widths[i]) + R));
+  ["workspace (/directory)", "branch", "sandbox", "/model", "quota"].forEach(
+    (l, i) => w(DIM + l.padEnd(widths[i]) + R),
+  );
   w("\n");
 
   // status values
-  const sandboxClr = sandbox ? OK : WARN;
-  const sandboxStr = sandbox ? "sandbox" : "no sandbox";
-  w("  ");
   w(TEXT + cwd.padEnd(widths[0]) + R);
   w(TEXT + branch.padEnd(widths[1]) + R);
-  w(sandboxClr + sandboxStr.padEnd(widths[2]) + R);
+  w(
+    (sandbox ? OK : WARN) +
+      (sandbox ? "sandbox" : "no sandbox").padEnd(widths[2]) +
+      R,
+  );
   w(TEXT + model.padEnd(widths[3]) + R);
   w(OK + quotaPct + "% used" + R);
   w("\n");
-}
 
-// ── Output helpers ────────────────────────────────────────────────────────────
-function printAI(content: string) {
+  // gap between status and input
   w("\n");
-  content.split("\n").forEach((l) => w("  " + TEXT + l + R + "\n"));
-  w("\n");
-}
 
-function printInfo(
-  text: string,
-  kind: "default" | "success" | "error" = "default",
-) {
-  const c = kind === "success" ? OK : kind === "error" ? WARN : MUTED;
-  w("\n  " + c + text + R + "\n\n");
-}
-
-function printHelp() {
-  const rows: [string, string][] = [
-    ["/help", "show this help"],
-    ["/clear", "clear conversation history"],
-    ["/history", "show message history"],
-    ["/model", "show current model"],
-    ["/exit", "quit"],
-  ];
-  w("\n");
-  rows.forEach(([cmd, desc]) =>
-    w("  " + BOLD + TEXT + cmd.padEnd(12) + R + "  " + MUTED + desc + R + "\n"),
+  // ── input block: py-1 px-2 ─────────────────────────────────────────────
+  // 3 lines: blank · active · blank
+  const placeholder = "Type your message or @path/to/file";
+  const padR = Math.max(0, C - 4 - placeholder.length - 2);
+  w(
+    BOX_BG +
+      "  " +
+      accent +
+      "› " +
+      DIM +
+      placeholder +
+      " ".repeat(padR) +
+      "  " +
+      R +
+      "\n",
   );
-  w("\n");
+  // cursor is 1 line below. readLine goes up 1.
 }
 
-// ── Bordered input box ────────────────────────────────────────────────────────
-//
-//  ╭──────────────────────────────────────────────────────────────╮
-//  │  > █                                                         │
-//  ╰──────────────────────────────────────────────────────────────╯
-//
-// Strategy:
-//   1. Draw all 3 lines once.
-//   2. Move cursor UP 2 to sit on the middle line (col 1).
-//   3. Every keypress: \r + rewrite middle line (no UP/DOWN ever again).
-//   4. On Enter: move DOWN 2 to land below the box cleanly.
-
-const CORNER_TL = "╭";
-const CORNER_TR = "╮";
-const CORNER_BL = "╰";
-const CORNER_BR = "╯";
-const HORIZ = "─";
-const VERT = "│";
-
-// The middle line content (no trailing newline)
-// "  │  > VALUE<pad>  │"
-// Visible prefix = "  │  > " = 7 chars
-const MID_PREFIX_VIS = 7; // "  │  > "
-const MID_SUFFIX_VIS = 3; // "  │"  (space+space+│ at end... actually "  │")
-
-function midLine(value: string): string {
-  const inner = cols() - 4; // between ╭ and ╮  (2 spaces indent each side)
-  const maxVal = inner - MID_PREFIX_VIS - MID_SUFFIX_VIS + 2;
+// ── Single active line ────────────────────────────────────────────────────────
+// "  › VALUE<pad>  "  — px-2 on each side, full width, BOX_BG
+function midLine(value: string, theme: string): string {
+  const C = cols();
+  const accent = THEME_COLORS[theme] ?? MUTED;
+  // visible prefix: "  › " = 4 chars, suffix: "  " = 2 chars
+  const maxVal = C - 4 - 2;
   const display = value.slice(-maxVal);
-  const pad = Math.max(0, inner - MID_PREFIX_VIS - display.length - 2);
-
+  const pad = Math.max(0, C - 4 - display.length - 2);
+  const PHOLDER = "Type your message or @path/to/file";
+  const PLACEHOLDER_FG = "\x1b[38;2;82;82;91m"; // zinc-600 ~30% opacity feel
+  const body =
+    display.length > 0
+      ? TEXT + display + R
+      : PLACEHOLDER_FG + PHOLDER.slice(0, maxVal) + R;
+  const visLen =
+    display.length > 0 ? display.length : Math.min(PHOLDER.length, maxVal);
+  const padDyn = Math.max(0, C - 4 - visLen - 2);
   return (
+    BOX_BG +
     "  " +
-    BORDER +
-    VERT +
-    R +
-    INPUT_BG +
-    "  > " +
-    TEXT +
-    display +
-    R +
-    INPUT_BG +
-    " ".repeat(pad) +
-    R +
-    BORDER +
+    accent +
+    "› " +
+    body +
+    BOX_BG +
+    " ".repeat(padDyn) +
     "  " +
-    VERT +
     R
   );
 }
 
-function drawBox(value: string) {
-  const inner = cols() - 4;
-  const h = HORIZ.repeat(inner);
-  w("  " + BORDER + CORNER_TL + h + CORNER_TR + R + "\n");
-  w(midLine(value) + "\n");
-  w("  " + BORDER + CORNER_BL + h + CORNER_BR + R + "\n");
+// Snap cursor to just after typed value: col = 2("  ") + 1("›") + 1(" ") + visLen + 1
+function setCursor(value: string) {
+  const maxVal = cols() - 6;
+  const visLen = Math.min(value.length, maxVal);
+  w(`\x1b[${visLen + 5}G`);
 }
 
-function readLine(): Promise<string> {
+// ── Read line ─────────────────────────────────────────────────────────────────
+function readLine(theme: string): Promise<string> {
   return new Promise((resolve) => {
     let value = "";
 
-    // Draw box — cursor ends up below bottom border line
-    drawBox(value);
-
-    // Go up 2 lines → land on middle line (col 1 implicitly via \r in redraws)
-    w("\x1b[2A" + SHOW);
+    // repaint wrote 1 input line then \n → cursor is 1 line below input.
+    // Go up 1 → land on input line.
+    w("\x1b[1A");
+    w("\r\x1b[K" + midLine(value, theme));
+    setCursor(value);
+    w(SHOW);
 
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -185,19 +184,18 @@ function readLine(): Promise<string> {
       process.stdin.removeListener("data", onData);
     };
 
-    // Redraw only the middle line in place
     const redraw = () => {
-      w("\r\x1b[K" + midLine(value));
+      w("\r\x1b[K" + midLine(value, theme));
+      setCursor(value);
     };
 
     const onData = (key: string) => {
       if (key === "\r" || key === "\n") {
-        // Move down 2 (past bottom border) then newline
-        w("\x1b[2B\n" + HIDE);
+        w("\x1b[1B" + HIDE);
         cleanup();
         resolve(value);
       } else if (key === "\x03") {
-        w("\x1b[2B\n");
+        w("\x1b[1B");
         cleanup();
         resolve("/exit");
       } else if (key === "\x7f" || key === "\b") {
@@ -215,84 +213,71 @@ function readLine(): Promise<string> {
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
-export async function startChat(model: string) {
-  const history: Message[] = [];
+export async function startChat(model: string, theme = "zinc") {
+  const state: UIState = {
+    model,
+    theme,
+    sandbox: false,
+    quotaPct: 0,
+    messages: [],
+  };
 
   w(HIDE);
-  printHeader(model);
-  w("\n");
+  repaint(state);
 
   process.on("SIGINT", () => {
     w(SHOW + "\n");
-    printInfo("Goodbye 👋", "success");
     process.exit(0);
   });
 
   while (true) {
-    const raw = await readLine();
+    const raw = await readLine(theme);
     const trimmed = raw.trim();
+
     if (!trimmed) {
-      w("\n");
+      repaint(state);
       continue;
     }
 
     if (trimmed === "/help" || trimmed === "?") {
-      printHelp();
+      state.messages.push({
+        role: "assistant",
+        content:
+          "/help      show this help\n/clear     clear conversation\n/model     show current model\n/exit      quit",
+      });
+      repaint(state);
       continue;
     }
 
     if (trimmed === "/exit" || trimmed === "/quit") {
-      printInfo("Goodbye 👋", "success");
-      w(SHOW);
+      w(CLEAR_SCREEN + SHOW);
       break;
     }
-
     if (trimmed === "/clear") {
-      history.length = 0;
-      printInfo("✓  Conversation cleared.", "success");
-      continue;
-    }
-
-    if (trimmed === "/history") {
-      if (!history.length) {
-        printInfo("No history yet.");
-      } else {
-        w("\n");
-        history.forEach((m, i) => {
-          const lbl = m.role === "user" ? OK + "you" + R : TEXT + "ai" + R;
-          const preview =
-            m.content.slice(0, 72) + (m.content.length > 72 ? "…" : "");
-          w(
-            "  " +
-              MUTED +
-              String(i + 1).padStart(2) +
-              ". " +
-              R +
-              lbl +
-              "  " +
-              MUTED +
-              preview +
-              R +
-              "\n",
-          );
-        });
-        w("\n");
-      }
+      state.messages = [];
+      repaint(state);
       continue;
     }
 
     if (trimmed === "/model") {
-      printInfo(`Model: ${model}`);
+      state.messages.push({ role: "assistant", content: `Model: ${model}` });
+      repaint(state);
       continue;
     }
 
     if (trimmed.startsWith("/")) {
-      printInfo(`Unknown command: ${trimmed}  ·  try /help`, "error");
+      state.messages.push({
+        role: "assistant",
+        content: `Unknown: ${trimmed}  ·  try /help`,
+      });
+      repaint(state);
       continue;
     }
 
-    history.push({ role: "user", content: trimmed });
-    printAI("Echo: " + trimmed);
-    history.push({ role: "assistant", content: "Echo: " + trimmed });
+    state.messages.push({ role: "user", content: trimmed });
+    repaint(state);
+    // TODO: replace with real ollama streaming call
+    state.messages.push({ role: "assistant", content: "Echo: " + trimmed });
+    repaint(state);
   }
 }

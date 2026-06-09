@@ -23,7 +23,7 @@ export function chatCommand(): Command {
 
       while (true) {
         const userInput = await input({
-          message: chalk.green("You ->"),
+          message: chalk.hex("#a1a1aa")(" ›"),
         });
 
         const message = userInput.trim();
@@ -79,7 +79,7 @@ export function chatCommand(): Command {
         }
 
         history.push({ role: "user", content: message });
-        console.log(chalk.blue("AI ->:"), "Echo: " + message);
+        console.log(chalk.hex("#e4e4e7")(" › "), "Echo: " + message);
       }
     });
 }
