@@ -1,4 +1,7 @@
 import { execSync } from "child_process";
+import { stat } from "fs/promises";
+import { chatResponse } from "../ollama/chat";
+import { couldStartTrivia } from "typescript";
 
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -275,7 +278,21 @@ export async function startChat(model: string, theme = "zinc") {
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
     // TODO: replace with real ollama streaming call
-    state.messages.push({ role: "assistant", content: "Echo: " + trimmed });
-    repaint(state);
+    let assistantContent = "";
+    state.messages.push({ role: "assistant", content: "" });
+
+    await chatResponse({
+      messages: state.messages.slice(0, -1),
+      model: state.model,
+      onChunk: (token) => {
+        assistantContent += token;
+
+        state.messages[state.messages.length - 1] = {
+          role: "assistant",
+          content: assistantContent,
+        };
+        repaint(state);
+      },
+    });
   }
 }

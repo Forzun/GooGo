@@ -1,5 +1,5 @@
 interface ChatMessage {
-  user: "user" | "assistant";
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -17,18 +17,17 @@ export async function chatResponse({
   try {
     const response = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: model,
+        model,
         messages,
         stream: true,
       }),
     });
+
     if (!response.body) throw new Error("No response body");
 
-    const reader = response.body?.getReader();
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullResponse = "";
 
@@ -38,11 +37,11 @@ export async function chatResponse({
       if (done) break;
 
       const chunk = decoder.decode(value);
-      const lines = chunk.split("/n").filter(Boolean);
+      const lines = chunk.split("\n").filter(Boolean);
 
       for (const line of lines) {
         const data = JSON.parse(line);
-        const token = data.messages?.content || "";
+        const token = data.message?.content || "";
         fullResponse += token;
         onChunk(token);
       }
