@@ -1,7 +1,5 @@
-import type { Message } from "ollama/dist/browser.cjs";
 import { execSync } from "child_process";
 
-// ── ANSI ──────────────────────────────────────────────────────────────────────
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const HIDE = "\x1b[?25l";
@@ -12,7 +10,7 @@ const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
 const bg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
 
 const TEXT = fg(228, 228, 231);
-const MUTED = fg(161, 161, 170);
+const MUTED = fg(161, 161, 171);
 const DIM = fg(113, 113, 122);
 const WARN = fg(251, 146, 60);
 const OK = fg(134, 239, 172);
@@ -85,30 +83,30 @@ function repaint(state: UIState) {
 
   // status labels
   const widths = [28, 10, 14, 26, 0];
+
   ["workspace (/directory)", "branch", "sandbox", "/model", "quota"].forEach(
-    (l, i) => w(DIM + l.padEnd(widths[i]) + R),
+    (l, i) => w(DIM + l.padEnd(widths[i]!) + R),
   );
   w("\n");
 
   // status values
-  w(TEXT + cwd.padEnd(widths[0]) + R);
-  w(TEXT + branch.padEnd(widths[1]) + R);
+  w(TEXT + cwd.padEnd(widths[0]!) + R);
+  w(TEXT + branch.padEnd(widths[1]!) + R);
   w(
     (sandbox ? OK : WARN) +
-      (sandbox ? "sandbox" : "no sandbox").padEnd(widths[2]) +
+      (sandbox ? "sandbox" : "no sandbox").padEnd(widths[2]!) +
       R,
   );
-  w(TEXT + model.padEnd(widths[3]) + R);
+  w(TEXT + model.padEnd(widths[3]!) + R);
   w(OK + quotaPct + "% used" + R);
   w("\n");
 
-  // gap between status and input
   w("\n");
 
-  // ── input block: py-1 px-2 ─────────────────────────────────────────────
-  // 3 lines: blank · active · blank
   const placeholder = "Type your message or @path/to/file";
   const padR = Math.max(0, C - 4 - placeholder.length - 2);
+  const blankRow = BOX_BG + " ".repeat(C) + R + "\n";
+  w(blankRow);
   w(
     BOX_BG +
       "  " +
@@ -121,7 +119,8 @@ function repaint(state: UIState) {
       R +
       "\n",
   );
-  // cursor is 1 line below. readLine goes up 1.
+  w(blankRow);
+  // 3 lines total. cursor below bottom blank → readLine goes up 2.
 }
 
 // ── Single active line ────────────────────────────────────────────────────────
@@ -169,7 +168,7 @@ function readLine(theme: string): Promise<string> {
 
     // repaint wrote 1 input line then \n → cursor is 1 line below input.
     // Go up 1 → land on input line.
-    w("\x1b[1A");
+    w("\x1b[2A");
     w("\r\x1b[K" + midLine(value, theme));
     setCursor(value);
     w(SHOW);
@@ -191,11 +190,11 @@ function readLine(theme: string): Promise<string> {
 
     const onData = (key: string) => {
       if (key === "\r" || key === "\n") {
-        w("\x1b[1B" + HIDE);
+        w("\x1b[2B" + HIDE);
         cleanup();
         resolve(value);
       } else if (key === "\x03") {
-        w("\x1b[1B");
+        w("\x1b[2B");
         cleanup();
         resolve("/exit");
       } else if (key === "\x7f" || key === "\b") {
@@ -212,7 +211,6 @@ function readLine(theme: string): Promise<string> {
   });
 }
 
-// ── Main loop ─────────────────────────────────────────────────────────────────
 export async function startChat(model: string, theme = "zinc") {
   const state: UIState = {
     model,
