@@ -1,8 +1,13 @@
 import { execSync } from "child_process";
-import { stat } from "fs/promises";
 import { chatResponse } from "../ollama/chat";
-import { couldStartTrivia } from "typescript";
+import { GooLoader } from "../loaders/progress";
+import { pullModel } from "../ollama/pull-models";
+import { input } from "@inquirer/prompts";
+import type { ColorInfo } from "chalk";
+import { errorMonitor } from "events";
+import { stat } from "fs/promises";
 
+let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const HIDE = "\x1b[?25l";
@@ -240,12 +245,65 @@ export async function startChat(model: string, theme = "zinc") {
       continue;
     }
 
+    function stopLoader() {
+      if (currentLoader) {
+        currentLoader.stop();
+        currentLoader = null;
+      }
+    }
+
+    function startLoader(label: string) {
+      stopLoader();
+      currentLoader = new GooLoader("green").start();
+      currentLoader.setLabel(label);
+      return currentLoader;
+    }
+
     if (trimmed === "/help" || trimmed === "?") {
       state.messages.push({
         role: "assistant",
         content:
-          "/help      show this help\n/clear     clear conversation\n/model     show current model\n/exit      quit",
+          "/help      show this help\n/clear     clear conversation\n/model     show current model\n/pull      pull ollama model\n/exit      quit",
       });
+      repaint(state);
+      continue;
+    }
+
+    if (trimmed === "/pull") {
+      stopLoader();
+      w(SHOW);
+      const modelName = await input({
+        message: "Enter model name",
+      });
+
+      w(HIDE);
+      startLoader(`pulling ${modelName}`);
+      try {
+        await pullModel({
+          model: modelName,
+          onProgress: (progress) => {
+            if (progress.total && progress.completed) {
+              const pct = Math.round(
+                (progress.completed / progress.total) * 100,
+              );
+              currentLoader?.setLabel(`pulling ${modelName} ${pct}%`);
+            } else {
+              currentLoader?.setLabel(progress.status);
+            }
+          },
+        });
+        stopLoader();
+        state.messages.push({
+          role: "assistant",
+          content: `✅ ${modelName} pulled successfully`,
+        });
+      } catch (error) {
+        stopLoader();
+        state.messages.push({
+          role: "assistant",
+          content: `❌ Failed to pull ${modelName}`,
+        });
+      }
       repaint(state);
       continue;
     }
@@ -277,7 +335,7 @@ export async function startChat(model: string, theme = "zinc") {
 
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
-    // TODO: replace with real ollama streaming call
+
     let assistantContent = "";
     state.messages.push({ role: "assistant", content: "" });
 
@@ -294,5 +352,30 @@ export async function startChat(model: string, theme = "zinc") {
         repaint(state);
       },
     });
+  }
+}
+
+async function downloadModel(modelName: string, color: string) {
+  const loader = new GooLoader("amber");
+  loader.setLabel(`pulling ${modelName}`);
+
+  try {
+    await pullModel({
+      model: modelName,
+      onProgress: (progress) => {
+        if (progress.total && progress.completed) {
+          const percent = Math.round(
+            (progress.completed / progress.total) * 100,
+          );
+          loader.setLabel(`pulling ${modelName} ${percent}%`);
+        } else {
+          loader.setLabel(progress.status);
+        }
+      },
+    });
+
+    loader.stop(`${modelName} ready`);
+  } catch (error) {
+    console.log(error);
   }
 }
