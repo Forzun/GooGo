@@ -3,9 +3,9 @@ import { chatResponse } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
 import { input } from "@inquirer/prompts";
-import type { ColorInfo } from "chalk";
-import { errorMonitor } from "events";
-import { stat } from "fs/promises";
+import { clearHistory, loadHistory, saveHistory } from "./history";
+import { Terminal } from "bun";
+import type { Histogram } from "perf_hooks";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -162,20 +162,16 @@ function midLine(value: string, theme: string): string {
   );
 }
 
-// Snap cursor to just after typed value: col = 2("  ") + 1("›") + 1(" ") + visLen + 1
 function setCursor(value: string) {
   const maxVal = cols() - 6;
   const visLen = Math.min(value.length, maxVal);
   w(`\x1b[${visLen + 5}G`);
 }
 
-// ── Read line ─────────────────────────────────────────────────────────────────
 function readLine(theme: string): Promise<string> {
   return new Promise((resolve) => {
     let value = "";
 
-    // repaint wrote 1 input line then \n → cursor is 1 line below input.
-    // Go up 1 → land on input line.
     w("\x1b[2A");
     w("\r\x1b[K" + midLine(value, theme));
     setCursor(value);
@@ -263,10 +259,15 @@ export async function startChat(model: string, theme = "zinc") {
       state.messages.push({
         role: "assistant",
         content:
-          "/help      show this help\n/clear     clear conversation\n/model     show current model\n/pull      pull ollama model\n/exit      quit",
+          "/help      show this help\n/clear     clear conversation\n/model     show current model\n/pull      pull ollama model\n/history   all your history\n/quit      quit",
       });
       repaint(state);
       continue;
+    }
+
+    if (trimmed === "/history") {
+      const history = await loadHistory();
+      const last10 = history.slice(-10);
     }
 
     if (trimmed === "/pull") {
@@ -295,7 +296,7 @@ export async function startChat(model: string, theme = "zinc") {
         stopLoader();
         state.messages.push({
           role: "assistant",
-          content: `✅ ${modelName} pulled successfully`,
+          content: `✅ ${modelName} pulled successfully /mode to see`,
         });
       } catch (error) {
         stopLoader();
@@ -314,6 +315,7 @@ export async function startChat(model: string, theme = "zinc") {
     }
     if (trimmed === "/clear") {
       state.messages = [];
+      clearHistory();
       repaint(state);
       continue;
     }
@@ -352,6 +354,8 @@ export async function startChat(model: string, theme = "zinc") {
         repaint(state);
       },
     });
+
+    await saveHistory(state.messages);
   }
 }
 
