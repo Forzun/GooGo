@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { chatResponse } from "../ollama/chat";
+import { chatResponse, chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
 import { input } from "@inquirer/prompts";
@@ -9,6 +9,8 @@ import {
   type Highlighter,
   type BundledLanguage,
 } from "shiki";
+import { hexToAnsi } from "./Color";
+import { i } from "shiki/dist/langs-bundle-full-C-zczmvu.mjs";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -63,7 +65,7 @@ let highlighter: Highlighter | null = null;
 
 export async function initHighlighter() {
   highlighter = await createHighlighter({
-    themes: ["github-dark"],
+    themes: ["gruvbox-dark-hard"],
     langs: [
       "typescript",
       "javascript",
@@ -124,12 +126,17 @@ function renderMessage(content: string): string {
     } else {
       try {
         const tokens = highlighter.codeToTokensBase(part.value, {
-          lang: part.lang as BundledLanguage,
+          lang: part.lang! as BundledLanguage,
           theme: "gruvbox-dark-hard",
         });
-        output += tokens;
+        for (const line of tokens) {
+          for (const token of line) {
+            output += hexToAnsi(token.color ?? "#ffffff") + token.content;
+          }
+
+          output += "\x1b[0m\n";
+        }
       } catch {
-        // Fallback if language not loaded
         output += part.value;
       }
     }
@@ -423,22 +430,47 @@ export async function startChat(model: string, theme = "zinc") {
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
 
-    let assistantContent = "";
     state.messages.push({ role: "assistant", content: "" });
 
-    await chatResponse({
-      messages: state.messages.slice(0, -1),
-      model: state.model,
-      onChunk: (token) => {
-        assistantContent += token;
+    let assistantContent = "";
 
+    try {
+      const stream = await chatResponseStream({
+        messages: state.messages.slice(0, -1),
+        model: state.model,
+      });
+
+      for await (const token of stream) {
+        assistantContent += token;
         state.messages[state.messages.length - 1] = {
           role: "assistant",
           content: assistantContent,
         };
-        repaint(state);
-      },
-    });
+
+        process.stdout.write(token);
+      }
+
+      console.log("\n");
+      repaint(state);
+    } catch (error) {
+      state.messages[state.messages.length - 1]!.content =
+        "❌ Error: " + (error instanceof Error ? error.message : String(error));
+      repaint(state);
+    }
+
+    // await chatResponse({
+    //   messages: state.messages.slice(0, -1),
+    //   model: state.model,
+    //   onChunk: (token) => {
+    //     assistantContent += token;
+
+    //     state.messages[state.messages.length - 1] = {
+    //       role: "assistant",
+    //       content: assistantContent,
+    //     };
+    //     repaint(state);
+    //   },
+    // });
 
     await saveHistory(state.messages);
   }

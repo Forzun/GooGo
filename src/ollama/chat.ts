@@ -52,3 +52,45 @@ export async function chatResponse({
     throw error;
   }
 }
+
+export async function chatResponseStream({
+  messages,
+  model,
+}: {
+  messages: { role: "user" | "assistant"; content: string }[];
+  model: string;
+}) {
+  const response = await fetch("http://localhost:11434/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.body) throw new Error(`No response body`);
+
+  const reander = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  return {
+    async *[Symbol.asyncIterator]() {
+      while (true) {
+        const { done, value } = await reander.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter(Boolean);
+
+        for (const line of lines) {
+          const data = JSON.parse(line);
+          yield data.message?.content || "";
+        }
+      }
+    },
+  };
+}
