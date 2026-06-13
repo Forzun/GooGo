@@ -360,6 +360,9 @@ export async function startChat(model: string, theme = "zinc") {
     if (trimmed === "/history") {
       const history = await loadHistory();
       const last10 = history.slice(-10);
+      process.stdout.write("hi there");
+      repaint(state);
+      continue;
     }
 
     if (trimmed === "/pull") {
