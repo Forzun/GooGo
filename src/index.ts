@@ -8,7 +8,7 @@ import { colorMap, pickTheme } from "./utils/Color";
 import { printWelcome } from "./loaders/frontLoader";
 import { chatCommand } from "./commands/chat";
 import { createCommand } from "./commands/create";
-import { startChat } from "./utils/startChat";
+import { startChat, initHighlighter } from "./utils/startChat";
 
 const program = new Command();
 
@@ -55,6 +55,7 @@ program.action(async () => {
   });
   console.log(chalk.gray(`\nUsing model: ${selectedModel}\n`));
 
+  await initHighlighter();
   await startChat(selectedModel, color);
 });
 

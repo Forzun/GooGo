@@ -4,13 +4,16 @@ import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
 import { input } from "@inquirer/prompts";
 import { clearHistory, loadHistory, saveHistory } from "./history";
-import { Terminal } from "bun";
-import type { Histogram } from "perf_hooks";
+import {
+  createHighlighter,
+  type Highlighter,
+  type BundledLanguage,
+} from "shiki";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const HIDE = "\x1b[?25l";
+const HIDE = "\x2b[?25l";
 const SHOW = "\x1b[?25h";
 const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
@@ -56,6 +59,85 @@ interface UIState {
   messages: { role: "user" | "assistant"; content: string }[];
 }
 
+let highlighter: Highlighter | null = null;
+
+export async function initHighlighter() {
+  highlighter = await createHighlighter({
+    themes: ["github-dark"],
+    langs: [
+      "typescript",
+      "javascript",
+      "python",
+      "bash",
+      "json",
+      "html",
+      "css",
+      "markdown",
+      "rust",
+      "go",
+      "tsx",
+      "jsx",
+    ],
+  });
+}
+
+function parseContent(
+  content: string,
+): { type: "text" | "code"; lang?: string; value: string }[] {
+  const parts: ReturnType<typeof parseContent> = [];
+  const regex = /```(\w+)?\n([\s\S]*?)```/g;
+
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({
+        type: "text",
+        value: content.slice(lastIndex, match.index),
+      });
+    }
+    parts.push({
+      type: "code",
+      lang: match[1] || "text",
+      value: match[2]!.trim(),
+    });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({ type: "text", value: content.slice(lastIndex) });
+  }
+
+  return parts.length ? parts : [{ type: "text", value: content }];
+}
+
+function renderMessage(content: string): string {
+  if (!highlighter) return content;
+
+  const parts = parseContent(content);
+  let output = "";
+
+  for (const part of parts) {
+    if (part.type === "text") {
+      output += part.value;
+    } else {
+      try {
+        const tokens = highlighter.codeToTokensBase(part.value, {
+          lang: part.lang as BundledLanguage,
+          theme: "gruvbox-dark-hard",
+        });
+        output += tokens;
+      } catch {
+        // Fallback if language not loaded
+        output += part.value;
+      }
+    }
+  }
+
+  return output;
+}
+
 // ── Repaint ───────────────────────────────────────────────────────────────────
 function repaint(state: UIState) {
   const { model, theme, sandbox, quotaPct, messages } = state;
@@ -81,7 +163,9 @@ function repaint(state: UIState) {
         w(MUTED + " you  " + R + TEXT + m.content + R + "\n");
       } else {
         w("\n");
-        m.content.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
+        // Use renderMessage for assistant content with code highlighting
+        const rendered = renderMessage(m.content);
+        rendered.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
         w("\n");
       }
     });
@@ -91,7 +175,6 @@ function repaint(state: UIState) {
 
   // status labels
   const widths = [28, 10, 14, 26, 0];
-
   ["workspace (/directory)", "branch", "sandbox", "/model", "quota"].forEach(
     (l, i) => w(DIM + l.padEnd(widths[i]!) + R),
   );
@@ -128,7 +211,9 @@ function repaint(state: UIState) {
       "\n",
   );
   w(blankRow);
-  // 3 lines total. cursor below bottom blank → readLine goes up 2.
+
+  // REMOVED: Duplicate message loop that was here
+  // The message rendering is now handled above in the messages.slice(-30) loop
 }
 
 // ── Single active line ────────────────────────────────────────────────────────
