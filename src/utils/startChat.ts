@@ -290,6 +290,9 @@ function readLine(theme: string): Promise<string> {
         suggestions.forEach((cmd) => {
           w(DIM + cmd.name.padEnd(12) + cmd.desc + R + "\n");
         });
+
+        const upLines = suggestions.length + 1;
+        w(`\x1b[${upLines}A`);
       }
 
       setCursor(value);
@@ -297,10 +300,27 @@ function readLine(theme: string): Promise<string> {
 
     const onData = (key: string) => {
       if (key === "\r" || key === "\n") {
+        const suggestions = filterCommand(value);
+
+        if (suggestions.length > 0) {
+          w("\n");
+          for (let i = 0; i < suggestions.length; i++) {
+            w("\r\x1b[K\n");
+          }
+          w(`\x1b[${suggestions.length + 1}A`);
+        }
         w("\x1b[2B" + HIDE);
         cleanup();
         resolve(value);
       } else if (key === "\x03") {
+        const suggestions = filterCommand(value);
+        if (suggestions.length > 0) {
+          w("\n");
+          for (let i = 0; i < suggestions.length; i++) {
+            w("\r\x1b[K\n");
+          }
+          w(`\x1b[${suggestions.length + 1}A`);
+        }
         w("\x1b[2B");
         cleanup();
         resolve("/exit");
@@ -308,6 +328,13 @@ function readLine(theme: string): Promise<string> {
         if (value.length === 0) return;
         value = value.slice(0, -1);
         redraw();
+      } else if (key === "\t") {
+        // Tab autocomplete
+        const suggestions = filterCommand(value);
+        if (suggestions.length === 1) {
+          value = suggestions[0]!.name + " ";
+          redraw();
+        }
       } else if (key.charCodeAt(0) >= 32) {
         value += key;
         redraw();
