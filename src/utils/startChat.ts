@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { chatResponse, chatResponseStream } from "../ollama/chat";
+import { chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
 import { input } from "@inquirer/prompts";
@@ -10,7 +10,7 @@ import {
   type BundledLanguage,
 } from "shiki";
 import { hexToAnsi } from "./Color";
-import { i } from "shiki/dist/langs-bundle-full-C-zczmvu.mjs";
+import { filterCommand } from "./filter";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -281,6 +281,17 @@ function readLine(theme: string): Promise<string> {
 
     const redraw = () => {
       w("\r\x1b[K" + midLine(value, theme));
+
+      const suggestions = filterCommand(value);
+
+      if (suggestions.length > 0) {
+        w("\n");
+
+        suggestions.forEach((cmd) => {
+          w(DIM + cmd.name.padEnd(12) + cmd.desc + R + "\n");
+        });
+      }
+
       setCursor(value);
     };
 
