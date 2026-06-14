@@ -22,6 +22,8 @@ const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
 const bg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
 
+const SUGG_CMD = "\x1b[38;2;70;70;78m"; // dim purple-gray for command
+const SUGG_DESC = "\x1b[38;2;55;55;62m"; // even dimmer for description
 const TEXT = fg(228, 228, 231);
 const MUTED = fg(161, 161, 171);
 const DIM = fg(113, 113, 122);
@@ -204,23 +206,20 @@ function repaint(state: UIState) {
   const placeholder = "Type your message or @path/to/file";
   const padR = Math.max(0, C - 4 - placeholder.length - 2);
   const blankRow = BOX_BG + " ".repeat(C) + R + "\n";
-  w(blankRow);
-  w(
+  const inputRow =
     BOX_BG +
-      "  " +
-      accent +
-      "› " +
-      DIM +
-      placeholder +
-      " ".repeat(padR) +
-      "  " +
-      R +
-      "\n",
-  );
+    "  " +
+    accent +
+    "› " +
+    DIM +
+    placeholder +
+    " ".repeat(padR) +
+    "  " +
+    R +
+    "\n";
   w(blankRow);
-
-  // REMOVED: Duplicate message loop that was here
-  // The message rendering is now handled above in the messages.slice(-30) loop
+  w(inputRow);
+  w(blankRow);
 }
 
 // ── Single active line ────────────────────────────────────────────────────────
@@ -263,6 +262,7 @@ function setCursor(value: string) {
 function readLine(theme: string): Promise<string> {
   return new Promise((resolve) => {
     let value = "";
+    let prevSuggCount = 0;
 
     w("\x1b[2A");
     w("\r\x1b[K" + midLine(value, theme));
@@ -279,20 +279,47 @@ function readLine(theme: string): Promise<string> {
       process.stdin.removeListener("data", onData);
     };
 
+    const clearSuggestions = () => {
+      if (prevSuggCount === 0) return;
+      w("\x1b[1B"); // into bottom blank row
+      for (let i = 0; i < prevSuggCount; i++) {
+        w("\r\x1b[K\n");
+      }
+      w(`\x1b[${prevSuggCount + 1}A`);
+      prevSuggCount = 0;
+    };
+
     const redraw = () => {
+      // 1. rewrite input line
       w("\r\x1b[K" + midLine(value, theme));
 
+      // 2. clear old suggestions (they live BELOW the bottom blank row)
+      if (prevSuggCount > 0) {
+        w("\x1b[1B"); // move down 1 (into bottom blank row)
+        for (let i = 0; i < prevSuggCount; i++) {
+          w("\r\x1b[K\n");
+        }
+        w(`\x1b[${prevSuggCount + 1}A`); // back up to input line
+        prevSuggCount = 0;
+      }
+
+      // 3. draw new suggestions below bottom blank row
       const suggestions = filterCommand(value);
-
       if (suggestions.length > 0) {
-        w("\n");
-
+        w("\x1b[1B"); // skip bottom blank row
         suggestions.forEach((cmd) => {
-          w(DIM + cmd.name.padEnd(12) + cmd.desc + R + "\n");
+          w(
+            "\r\x1b[K  " +
+              SUGG_CMD +
+              cmd.name.padEnd(12) +
+              SUGG_DESC +
+              cmd.desc +
+              R +
+              "\n",
+          );
         });
-
-        const upLines = suggestions.length + 1;
-        w(`\x1b[${upLines}A`);
+        w(`\x1b[${suggestions.length + 1}A`); // back up to input line
+        prevSuggCount = suggestions.length;
       }
 
       setCursor(value);
@@ -300,27 +327,12 @@ function readLine(theme: string): Promise<string> {
 
     const onData = (key: string) => {
       if (key === "\r" || key === "\n") {
-        const suggestions = filterCommand(value);
-
-        if (suggestions.length > 0) {
-          w("\n");
-          for (let i = 0; i < suggestions.length; i++) {
-            w("\r\x1b[K\n");
-          }
-          w(`\x1b[${suggestions.length + 1}A`);
-        }
+        clearSuggestions();
         w("\x1b[2B" + HIDE);
         cleanup();
         resolve(value);
       } else if (key === "\x03") {
-        const suggestions = filterCommand(value);
-        if (suggestions.length > 0) {
-          w("\n");
-          for (let i = 0; i < suggestions.length; i++) {
-            w("\r\x1b[K\n");
-          }
-          w(`\x1b[${suggestions.length + 1}A`);
-        }
+        clearSuggestions();
         w("\x1b[2B");
         cleanup();
         resolve("/exit");
@@ -329,12 +341,16 @@ function readLine(theme: string): Promise<string> {
         value = value.slice(0, -1);
         redraw();
       } else if (key === "\t") {
-        // Tab autocomplete
         const suggestions = filterCommand(value);
         if (suggestions.length === 1) {
           value = suggestions[0]!.name + " ";
-          redraw();
+          // clear suggestions THEN redraw — no extra cursor movement
+          clearSuggestions();
+          w("\r\x1b[K" + midLine(value, theme));
+          prevSuggCount = 0;
+          setCursor(value);
         }
+        // multi or zero suggestions — do nothing
       } else if (key.charCodeAt(0) >= 32) {
         value += key;
         redraw();
