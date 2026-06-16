@@ -11,6 +11,7 @@ import {
 } from "shiki";
 import { hexToAnsi } from "./Color";
 import { filterCommand } from "./filter";
+import { clearPrompt } from "../tools/read-file";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -147,7 +148,6 @@ function renderMessage(content: string): string {
   return output;
 }
 
-// ── Repaint ───────────────────────────────────────────────────────────────────
 function repaint(state: UIState) {
   const { model, theme, sandbox, quotaPct, messages } = state;
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~");
@@ -164,7 +164,6 @@ function repaint(state: UIState) {
   // shift+tab
   w(HINT + "Shift+Tab to accept edits" + R + "\n");
 
-  // messages
   if (messages.length > 0) {
     w("\n");
     messages.slice(-30).forEach((m) => {
@@ -172,7 +171,6 @@ function repaint(state: UIState) {
         w(MUTED + " you  " + R + TEXT + m.content + R + "\n");
       } else {
         w("\n");
-        // Use renderMessage for assistant content with code highlighting
         const rendered = renderMessage(m.content);
         rendered.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
         w("\n");
@@ -222,17 +220,14 @@ function repaint(state: UIState) {
   w(blankRow);
 }
 
-// ── Single active line ────────────────────────────────────────────────────────
-// "  › VALUE<pad>  "  — px-2 on each side, full width, BOX_BG
 function midLine(value: string, theme: string): string {
   const C = cols();
   const accent = THEME_COLORS[theme] ?? MUTED;
-  // visible prefix: "  › " = 4 chars, suffix: "  " = 2 chars
   const maxVal = C - 4 - 2;
   const display = value.slice(-maxVal);
   const pad = Math.max(0, C - 4 - display.length - 2);
   const PHOLDER = "Type your message or @path/to/file";
-  const PLACEHOLDER_FG = "\x1b[38;2;82;82;91m"; // zinc-600 ~30% opacity feel
+  const PLACEHOLDER_FG = "\x1b[38;2;82;82;91m";
   const body =
     display.length > 0
       ? TEXT + display + R
@@ -290,10 +285,8 @@ function readLine(theme: string): Promise<string> {
     };
 
     const redraw = () => {
-      // 1. rewrite input line
       w("\r\x1b[K" + midLine(value, theme));
 
-      // 2. clear old suggestions (they live BELOW the bottom blank row)
       if (prevSuggCount > 0) {
         w("\x1b[1B"); // move down 1 (into bottom blank row)
         for (let i = 0; i < prevSuggCount; i++) {
@@ -303,7 +296,6 @@ function readLine(theme: string): Promise<string> {
         prevSuggCount = 0;
       }
 
-      // 3. draw new suggestions below bottom blank row
       const suggestions = filterCommand(value);
       if (suggestions.length > 0) {
         w("\x1b[1B"); // skip bottom blank row
@@ -414,7 +406,7 @@ export async function startChat(model: string, theme = "zinc") {
     if (trimmed === "/history") {
       const history = await loadHistory();
       const last10 = history.slice(-10);
-      process.stdout.write("hi there");
+      process.stdout.write("not yet!");
       repaint(state);
       continue;
     }
@@ -514,20 +506,6 @@ export async function startChat(model: string, theme = "zinc") {
         "❌ Error: " + (error instanceof Error ? error.message : String(error));
       repaint(state);
     }
-
-    // await chatResponse({
-    //   messages: state.messages.slice(0, -1),
-    //   model: state.model,
-    //   onChunk: (token) => {
-    //     assistantContent += token;
-
-    //     state.messages[state.messages.length - 1] = {
-    //       role: "assistant",
-    //       content: assistantContent,
-    //     };
-    //     repaint(state);
-    //   },
-    // });
 
     await saveHistory(state.messages);
   }
