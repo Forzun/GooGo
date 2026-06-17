@@ -12,7 +12,7 @@ import {
 import { hexToAnsi } from "./Color";
 import { filterCommand, getFiles } from "./filter";
 import { getCurrentFileMention, searchFile } from "../tools/read-file";
-import type { indexOfLine } from "bun";
+import { file, type indexOfLine } from "bun";
 import type { NullLiteral } from "typescript";
 
 let currentLoader: GooLoader | null = null;
@@ -262,6 +262,17 @@ function readLine(theme: string): Promise<string> {
     let prevSuggCount = 0;
     let selectedIndex = 0;
     let suggestions: string[] | null = [];
+    let cmdSuggestions: { name: string; desc: string }[] = [];
+
+    let projectFiles: string[] = [];
+    let filesLoaded: boolean = false;
+
+    async function ensureFileLoaded() {
+      if (!filesLoaded) {
+        projectFiles = await getFiles();
+        filesLoaded = true;
+      }
+    }
 
     w("\x1b[2A");
     w("\r\x1b[K" + midLine(value, theme));
@@ -280,7 +291,7 @@ function readLine(theme: string): Promise<string> {
 
     const clearSuggestions = () => {
       if (prevSuggCount === 0) return;
-      w("\x1b[1B"); // into bottom blank row
+      w("\x1b[1B");
       for (let i = 0; i < prevSuggCount; i++) {
         w("\r\x1b[K\n");
       }
@@ -288,68 +299,70 @@ function readLine(theme: string): Promise<string> {
       prevSuggCount = 0;
     };
 
-    const redraw = async () => {
-      w("\r\x1b[K" + midLine(value, theme));
-      const projectFile = await getFiles();
+    const renderSuggestions = () => {
+      clearSuggestions();
 
       const mention = getCurrentFileMention(value);
 
       if (mention) {
-        suggestions = searchFile(mention, projectFile);
+        suggestions = searchFile(mention, projectFiles);
+        cmdSuggestions = [];
 
-        w("\r\x1b[K" + midLine(value, theme));
-
-        if (suggestions!?.length > 0) {
-          suggestions?.forEach((file, index) => {
-            const prefix = index === selectedIndex ? ">" : " ";
-
-            w(prefix + file + "\n");
+        if (suggestions!.length > 0) {
+          w("\x1b[1B");
+          suggestions!.forEach((file, index) => {
+            const prefix = index === selectedIndex ? "› " : "  ";
+            const color = index === selectedIndex ? TEXT : SUGG_CMD;
+            w("\r\x1b[K" + prefix + color + file + R + "\n");
           });
+          w(`\x1b[${suggestions!.length + 1}A`);
+          prevSuggCount = suggestions!.length;
+        }
+      } else {
+        suggestions = [];
+        cmdSuggestions = filterCommand(value);
+
+        if (cmdSuggestions.length > 0) {
+          w("\x1b[1B");
+          cmdSuggestions.forEach((cmd) => {
+            w(
+              "\r\x1b[K  " +
+                SUGG_CMD +
+                cmd.name.padEnd(12) +
+                SUGG_DESC +
+                cmd.desc +
+                R +
+                "\n",
+            );
+          });
+          w(`\x1b[${cmdSuggestions.length + 1}A`);
+          prevSuggCount = cmdSuggestions.length;
         }
       }
+    };
 
-      if (prevSuggCount > 0) {
-        w("\x1b[1B"); // move down 1 (into bottom blank row)
-        for (let i = 0; i < prevSuggCount; i++) {
-          w("\r\x1b[K\n");
-        }
-        w(`\x1b[${prevSuggCount + 1}A`); // back up to input line
-        prevSuggCount = 0;
-      }
-
-      const suggestion = filterCommand(value);
-      if (suggestion.length > 0) {
-        w("\x1b[1B"); // skip bottom blank row
-        suggestion.forEach((cmd) => {
-          w(
-            "\r\x1b[K  " +
-              SUGG_CMD +
-              cmd.name.padEnd(12) +
-              SUGG_DESC +
-              cmd.desc +
-              R +
-              "\n",
-          );
-        });
-        w(`\x1b[${suggestion.length + 1}A`); // back up to input line
-        prevSuggCount = suggestion.length;
-      }
-
+    const redraw = () => {
+      w("\r\x1b[K" + midLine(value, theme));
+      renderSuggestions();
       setCursor(value);
     };
 
-    const onData = (key: string) => {
-      if (key === "\x1b[A") {
-        selectedIndex = Math.max(0, selectedIndex - 1);
+    ensureFileLoaded();
 
-        redraw();
+    const onData = async (key: string) => {
+      if (key === "\x1b[A") {
+        if (suggestions!.length > 0) {
+          selectedIndex = Math.max(0, selectedIndex - 1);
+          redraw();
+        }
         return;
       }
 
       if (key === "\x1b[B") {
-        selectedIndex = Math.min(suggestions!.length - 1, selectedIndex + 1);
-
-        redraw();
+        if (suggestions!.length > 0) {
+          selectedIndex = Math.min(suggestions!.length - 1, selectedIndex + 1);
+          redraw();
+        }
         return;
       }
 
@@ -358,39 +371,50 @@ function readLine(theme: string): Promise<string> {
         w("\x1b[2B" + HIDE);
         cleanup();
         resolve(value);
-      } else if (key === "\x03") {
+        return;
+      }
+
+      if (key === "\x03") {
         clearSuggestions();
         w("\x1b[2B");
         cleanup();
         resolve("/exit");
-      } else if (key === "\x7f" || key === "\b") {
+        return;
+      }
+
+      if (key === "\x7f" || key === "\b") {
         if (value.length === 0) return;
         value = value.slice(0, -1);
         selectedIndex = 0;
         redraw();
-      } else if (key === "\t") {
+        return;
+      }
+
+      if (key === "\t") {
         if (suggestions!.length > 0) {
           const selected = suggestions![selectedIndex];
-
           value = value.replace(/@([^\s]*)$/, `@${selected}`);
-        } else {
-          const cmd = filterCommand(value);
-
-          if (cmd.length === 1) {
-            value = cmd[0]!.name + " ";
-            clearSuggestions();
-            w("\r\x1b[K" + midLine(value, theme));
-            prevSuggCount = 0;
-          }
+          selectedIndex = 0;
+        } else if (cmdSuggestions.length === 1) {
+          value = cmdSuggestions[0]!.name + " ";
         }
-
         redraw();
-        setCursor(value);
         return;
-      } else if (key.charCodeAt(0) >= 32) {
+      }
+
+      if (key === "@") {
+        value += key;
+        await ensureFileLoaded();
+        selectedIndex = 0;
+        redraw();
+        return;
+      }
+
+      if (key.charCodeAt(0) >= 32) {
         value += key;
         selectedIndex = 0;
         redraw();
+        return;
       }
     };
 
