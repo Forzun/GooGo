@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
-import { input } from "@inquirer/prompts";
+import { input, search } from "@inquirer/prompts";
 import { clearHistory, loadHistory, saveHistory } from "./history";
 import {
   createHighlighter,
@@ -10,8 +10,10 @@ import {
   type BundledLanguage,
 } from "shiki";
 import { hexToAnsi } from "./Color";
-import { filterCommand } from "./filter";
-import { clearPrompt } from "../tools/read-file";
+import { filterCommand, getFiles } from "./filter";
+import { getCurrentFileMention, searchFile } from "../tools/read-file";
+import type { indexOfLine } from "bun";
+import type { NullLiteral } from "typescript";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -258,6 +260,8 @@ function readLine(theme: string): Promise<string> {
   return new Promise((resolve) => {
     let value = "";
     let prevSuggCount = 0;
+    let selectedIndex = 0;
+    let suggestions: string[] | null = [];
 
     w("\x1b[2A");
     w("\r\x1b[K" + midLine(value, theme));
@@ -284,8 +288,25 @@ function readLine(theme: string): Promise<string> {
       prevSuggCount = 0;
     };
 
-    const redraw = () => {
+    const redraw = async () => {
       w("\r\x1b[K" + midLine(value, theme));
+      const projectFile = await getFiles();
+
+      const mention = getCurrentFileMention(value);
+
+      if (mention) {
+        suggestions = searchFile(mention, projectFile);
+
+        w("\r\x1b[K" + midLine(value, theme));
+
+        if (suggestions!?.length > 0) {
+          suggestions?.forEach((file, index) => {
+            const prefix = index === selectedIndex ? ">" : " ";
+
+            w(prefix + file + "\n");
+          });
+        }
+      }
 
       if (prevSuggCount > 0) {
         w("\x1b[1B"); // move down 1 (into bottom blank row)
@@ -296,10 +317,10 @@ function readLine(theme: string): Promise<string> {
         prevSuggCount = 0;
       }
 
-      const suggestions = filterCommand(value);
-      if (suggestions.length > 0) {
+      const suggestion = filterCommand(value);
+      if (suggestion.length > 0) {
         w("\x1b[1B"); // skip bottom blank row
-        suggestions.forEach((cmd) => {
+        suggestion.forEach((cmd) => {
           w(
             "\r\x1b[K  " +
               SUGG_CMD +
@@ -310,14 +331,28 @@ function readLine(theme: string): Promise<string> {
               "\n",
           );
         });
-        w(`\x1b[${suggestions.length + 1}A`); // back up to input line
-        prevSuggCount = suggestions.length;
+        w(`\x1b[${suggestion.length + 1}A`); // back up to input line
+        prevSuggCount = suggestion.length;
       }
 
       setCursor(value);
     };
 
     const onData = (key: string) => {
+      if (key === "\x1b[A") {
+        selectedIndex = Math.max(0, selectedIndex - 1);
+
+        redraw();
+        return;
+      }
+
+      if (key === "\x1b[B") {
+        selectedIndex = Math.min(suggestions!.length - 1, selectedIndex + 1);
+
+        redraw();
+        return;
+      }
+
       if (key === "\r" || key === "\n") {
         clearSuggestions();
         w("\x1b[2B" + HIDE);
@@ -331,20 +366,30 @@ function readLine(theme: string): Promise<string> {
       } else if (key === "\x7f" || key === "\b") {
         if (value.length === 0) return;
         value = value.slice(0, -1);
+        selectedIndex = 0;
         redraw();
       } else if (key === "\t") {
-        const suggestions = filterCommand(value);
-        if (suggestions.length === 1) {
-          value = suggestions[0]!.name + " ";
-          // clear suggestions THEN redraw — no extra cursor movement
-          clearSuggestions();
-          w("\r\x1b[K" + midLine(value, theme));
-          prevSuggCount = 0;
-          setCursor(value);
+        if (suggestions!.length > 0) {
+          const selected = suggestions![selectedIndex];
+
+          value = value.replace(/@([^\s]*)$/, `@${selected}`);
+        } else {
+          const cmd = filterCommand(value);
+
+          if (cmd.length === 1) {
+            value = cmd[0]!.name + " ";
+            clearSuggestions();
+            w("\r\x1b[K" + midLine(value, theme));
+            prevSuggCount = 0;
+          }
         }
-        // multi or zero suggestions — do nothing
+
+        redraw();
+        setCursor(value);
+        return;
       } else if (key.charCodeAt(0) >= 32) {
         value += key;
+        selectedIndex = 0;
         redraw();
       }
     };

@@ -1,3 +1,6 @@
+import { readdir } from "fs/promises";
+import path from "node:path";
+
 interface filterProps {
   filters: string[];
   value: string;
@@ -24,4 +27,33 @@ export function commandFilter({ filters, value }: filterProps) {
     word.toLocaleLowerCase().startsWith(value),
   );
   return filterWords;
+}
+
+export async function getFiles(
+  dir: string = process.cwd(),
+  files: string[] = [],
+): Promise<string[]> {
+  const entries = await readdir(dir, {
+    withFileTypes: true,
+  });
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      if (
+        entry.name === "node_modules" ||
+        entry.name === ".git" ||
+        entry.name === "dist"
+      ) {
+        continue;
+      }
+
+      await getFiles(fullPath, files);
+    } else {
+      files.push(path.relative(process.cwd(), fullPath));
+    }
+  }
+
+  return files;
 }

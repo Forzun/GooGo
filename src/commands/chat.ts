@@ -1,11 +1,12 @@
 import { Command } from "commander";
-import { input, select } from "@inquirer/prompts";
+import { select } from "@inquirer/prompts";
 import chalk from "chalk";
 import { type Message } from "../providers/type";
 import { listOllamaModels } from "../ollama/client";
 import { colorMap, pickTheme } from "../utils/Color";
 import { initHighlighter } from "../lib/shiki";
 import { startChat } from "../utils/startChat";
+import { getFiles } from "../utils/filter";
 
 export function chatCommand(): Command {
   return new Command()
