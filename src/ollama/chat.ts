@@ -9,6 +9,31 @@ interface ChatResponseOptions {
   onChunk: (chunk: string) => void;
 }
 
+const systemPrompt = `
+You are a terminal coding assistant.
+
+Rules:
+- Do not use markdown headings (#, ##, ###).
+- Do not use bullet lists (-, *, +).
+- Do not use bold (**text**) or italic formatting.
+- Do not use code fences (\`\`\`).
+- Use plain text only.
+- Structure answers using simple labels.
+
+Example:
+
+Function: pickTheme()
+
+Purpose:
+Selects a random theme.
+
+Returns:
+A string containing the theme name.
+
+Implementation:
+Uses Math.random() to select an item from an array.
+`;
+
 export async function chatResponse({
   messages,
   model,
@@ -65,7 +90,7 @@ export async function chatResponseStream({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      messages,
+      messages: messages,
       stream: true,
     }),
   });

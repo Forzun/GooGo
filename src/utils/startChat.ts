@@ -11,9 +11,11 @@ import {
 } from "shiki";
 import { hexToAnsi } from "./Color";
 import { filterCommand, getFiles } from "./filter";
-import { getCurrentFileMention, searchFile } from "../tools/read-file";
-import { file, type indexOfLine } from "bun";
-import type { NullLiteral } from "typescript";
+import {
+  customTrimmed,
+  getCurrentFileMention,
+  searchFile,
+} from "../tools/read-file";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -134,6 +136,8 @@ function renderMessage(content: string): string {
           lang: part.lang! as BundledLanguage,
           theme: "gruvbox-dark-hard",
         });
+        console.log("highlighter", !!highlighter);
+        console.log(parseContent(content));
         for (const line of tokens) {
           for (const token of line) {
             output += hexToAnsi(token.color ?? "#ffffff") + token.content;
@@ -544,6 +548,8 @@ export async function startChat(model: string, theme = "zinc") {
       repaint(state);
       continue;
     }
+
+    const trimmedPrompt = await customTrimmed(trimmed);
 
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);

@@ -1,40 +1,53 @@
-import { Command } from "commander";
 import { select } from "@inquirer/prompts";
-import chalk from "chalk";
-import { type Message } from "../providers/type";
 import { listOllamaModels } from "../ollama/client";
 import { colorMap, pickTheme } from "../utils/Color";
-import { initHighlighter } from "../lib/shiki";
-import { startChat } from "../utils/startChat";
-import { getFiles } from "../utils/filter";
+import { initHighlighter, startChat } from "../utils/startChat";
+import { Command } from "commander";
 
-export function chatCommand(): Command {
-  return new Command()
-    .command("chat")
-    .description("Start a chat session")
-    .action(async (opts) => {
-      const ollamaModels = await listOllamaModels();
+export async function chatAction() {
+  const ollamaModels = await listOllamaModels();
 
-      if (!ollamaModels || ollamaModels.length === 0) {
-        console.log(
-          chalk.yellow("⚠️  No models found. Run `ollama pull <model>` first."),
-        );
-        return;
-      }
+  if (!ollamaModels?.length) {
+    console.log("⚠️ No models found. Run `ollama pull <model>` first.");
+    return;
+  }
 
-      const color = pickTheme() as keyof typeof colorMap;
-      const themeColor = colorMap[color]!;
+  const color = pickTheme() as keyof typeof colorMap;
+  const themeColor = colorMap[color]!;
 
-      const selectedModel = await select({
-        message: themeColor("Select a model"),
-        choices: ollamaModels.map((m) => ({
-          name: `${themeColor("●")} ${m.name}`,
-          value: m.value,
-        })),
-      });
-      console.log(chalk.gray(`\nUsing model: ${selectedModel}\n`));
+  const selectedModel = await select({
+    message: themeColor("Select a model"),
+    choices: ollamaModels.map((m) => ({
+      name: `${themeColor("●")} ${m.name}`,
+      value: m.value,
+    })),
+  });
 
-      await initHighlighter();
-      await startChat(selectedModel, color);
+  await initHighlighter();
+  await startChat(selectedModel, color);
+}
+
+export function chatCommand() {
+  return new Command("chat").description("Start chat").action(async () => {
+    const ollamaModels = await listOllamaModels();
+
+    if (!ollamaModels?.length) {
+      console.log("⚠️ No models found. Run `ollama pull <model>` first.");
+      return;
+    }
+
+    const color = pickTheme() as keyof typeof colorMap;
+    const themeColor = colorMap[color]!;
+
+    const selectedModel = await select({
+      message: themeColor("Select a model"),
+      choices: ollamaModels.map((m) => ({
+        name: `${themeColor("●")} ${m.name}`,
+        value: m.value,
+      })),
     });
+
+    await initHighlighter();
+    await startChat(selectedModel, color);
+  });
 }

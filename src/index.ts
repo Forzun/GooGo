@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 import { printWelcome } from "./loaders/frontLoader";
-import { chatCommand } from "./commands/chat";
+import { chatAction, chatCommand } from "./commands/chat";
 import { createCommand } from "./commands/create";
 
 const program = new Command();
@@ -22,7 +22,6 @@ program
   .version("1.0.0");
 
 program.addCommand(chatCommand());
-program.addCommand(createCommand());
 
 if (process.argv.length <= 2) {
   process.argv.push("chat");
