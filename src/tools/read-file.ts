@@ -59,7 +59,7 @@ export async function customTrimmed(prompt: string) {
       ${userQuestion}
       `;
 
-  return finalPrompt;
+  return { userQuestion, finalPrompt };
 }
 
 export function searchFile(query: string, fiels: string[] = []) {

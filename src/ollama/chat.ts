@@ -1,3 +1,5 @@
+import type { filterCommand } from "../utils/filter";
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -9,29 +11,20 @@ interface ChatResponseOptions {
   onChunk: (chunk: string) => void;
 }
 
-const systemPrompt = `
-You are a terminal coding assistant.
+const SYSTEM_PROMPT = `You are Goo, an interactive coding assistant.
 
-Rules:
-- Do not use markdown headings (#, ##, ###).
-- Do not use bullet lists (-, *, +).
-- Do not use bold (**text**) or italic formatting.
-- Do not use code fences (\`\`\`).
-- Use plain text only.
-- Structure answers using simple labels.
+You are helping a software engineer work inside a codebase.
 
-Example:
+Guidelines:
 
-Function: pickTheme()
-
-Purpose:
-Selects a random theme.
-
-Returns:
-A string containing the theme name.
-
-Implementation:
-Uses Math.random() to select an item from an array.
+- Be concise by default.
+- Prefer practical explanations over documentation.
+- Assume the user can read code.
+- When asked to explain code, summarize the purpose first and then discuss only interesting implementation details.
+- When asked to generate code, provide complete working code.
+- When asked to modify code, preserve existing behavior unless instructed otherwise.
+- Use Markdown code fences for code snippets.
+- Avoid unnecessary introductions and conclusions.
 `;
 
 export async function chatResponse({
@@ -90,7 +83,13 @@ export async function chatResponseStream({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      messages: messages,
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        ...messages,
+      ],
       stream: true,
     }),
   });

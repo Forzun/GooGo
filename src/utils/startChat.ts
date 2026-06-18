@@ -10,12 +10,13 @@ import {
   type BundledLanguage,
 } from "shiki";
 import { hexToAnsi } from "./Color";
-import { filterCommand, getFiles } from "./filter";
+import { cleanResponse, filterCommand, getFiles } from "./filter";
 import {
   customTrimmed,
   getCurrentFileMention,
   searchFile,
 } from "../tools/read-file";
+import { prettify } from "./markdown";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -129,15 +130,13 @@ function renderMessage(content: string): string {
 
   for (const part of parts) {
     if (part.type === "text") {
-      output += part.value;
+      output += prettify(part.value);
     } else {
       try {
         const tokens = highlighter.codeToTokensBase(part.value, {
           lang: part.lang! as BundledLanguage,
           theme: "gruvbox-dark-hard",
         });
-        console.log("highlighter", !!highlighter);
-        console.log(parseContent(content));
         for (const line of tokens) {
           for (const token of line) {
             output += hexToAnsi(token.color ?? "#ffffff") + token.content;
@@ -549,10 +548,20 @@ export async function startChat(model: string, theme = "zinc") {
       continue;
     }
 
-    const trimmedPrompt = await customTrimmed(trimmed);
+    const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
+    console.log(userQuestion);
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
+
+    const messageForModels: { role: "user" | "assistant"; content: string }[] =
+      [
+        ...state.messages.slice(0, -1),
+        {
+          role: "user",
+          content: finalPrompt,
+        },
+      ];
 
     state.messages.push({ role: "assistant", content: "" });
 
@@ -560,7 +569,7 @@ export async function startChat(model: string, theme = "zinc") {
 
     try {
       const stream = await chatResponseStream({
-        messages: state.messages.slice(0, -1),
+        messages: messageForModels,
         model: state.model,
       });
 

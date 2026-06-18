@@ -57,3 +57,14 @@ export async function getFiles(
 
   return files;
 }
+
+export function cleanResponse(text: string) {
+  return text
+    .replace(/^\s*\d+\.\s+\*\*(.*?)\*\*:?/gm, "")
+    .replace(/^\s*-\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/^Imports:\s*$/gm, "")
+    .replace(/^Program Initialization:\s*$/gm, "")
+    .replace(/^Welcome Message:\s*$/gm, "")
+    .trim();
+}
