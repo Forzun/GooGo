@@ -2,8 +2,7 @@
 
 import { Command } from "commander";
 import { printWelcome } from "./loaders/frontLoader";
-import { chatAction, chatCommand } from "./commands/chat";
-import { createCommand } from "./commands/create";
+import { chatCommand } from "./commands/chat";
 
 const program = new Command();
 
