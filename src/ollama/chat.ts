@@ -1,7 +1,15 @@
-import type { filterCommand } from "../utils/filter";
+import type { ChatResponse } from "ollama";
+
+interface OllamaResponse {
+  message: {
+    content: string;
+    role: string;
+  };
+  done: boolean;
+}
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -26,50 +34,6 @@ Guidelines:
 - Use Markdown code fences for code snippets.
 - Avoid unnecessary introductions and conclusions.
 `;
-
-export async function chatResponse({
-  messages,
-  model,
-  onChunk,
-}: ChatResponseOptions) {
-  try {
-    const response = await fetch("http://localhost:11434/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-      }),
-    });
-
-    if (!response.body) throw new Error("No response body");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullResponse = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter(Boolean);
-
-      for (const line of lines) {
-        const data = JSON.parse(line);
-        const token = data.message?.content || "";
-        fullResponse += token;
-        onChunk(token);
-      }
-    }
-    return fullResponse;
-  } catch (error) {
-    console.error("Chat error", error);
-    throw error;
-  }
-}
 
 export async function chatResponseStream({
   messages,
@@ -117,4 +81,38 @@ export async function chatResponseStream({
       }
     },
   };
+}
+
+export async function chat({
+  messages,
+  model,
+}: {
+  messages: ChatMessage[];
+  model: string;
+}) {
+  try {
+    const response = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        model,
+
+        messages,
+
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.body) throw new Error(`No response body`);
+
+    const data = (await response.json()) as ChatResponse;
+    return data.message.content;
+  } catch (error) {
+    console.error(error);
+  }
 }

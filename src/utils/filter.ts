@@ -68,3 +68,7 @@ export function cleanResponse(text: string) {
     .replace(/^Welcome Message:\s*$/gm, "")
     .trim();
 }
+
+function sum(a, b): number {
+  return a + b;
+}

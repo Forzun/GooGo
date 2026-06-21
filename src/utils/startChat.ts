@@ -17,6 +17,8 @@ import {
   searchFile,
 } from "../tools/read-file";
 import { prettify } from "./markdown";
+import { runAgent } from "../ollama/agent";
+import { stat } from "fs/promises";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -568,6 +570,13 @@ export async function startChat(model: string, theme = "zinc") {
     let assistantContent = "";
 
     try {
+      const result = await runAgent({
+        messages: state.messages.slice(-1),
+        model: state.model,
+      });
+
+      console.log("tool calling message:", result);
+
       const stream = await chatResponseStream({
         messages: messageForModels,
         model: state.model,
