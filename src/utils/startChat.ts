@@ -578,6 +578,7 @@ export async function startChat(model: string, theme = "zinc") {
       const agent = await runAgent({
         messages: state.messages.slice(-1),
         model: state.model,
+        prompt: finalPrompt,
       });
 
       console.log("tool calling message:", agent);

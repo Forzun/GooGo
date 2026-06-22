@@ -1,3 +1,4 @@
+import { createFunction } from "../tools/create-function";
 import { deleteFunction } from "../tools/delete-function";
 import { editFunction } from "../tools/edit-function";
 import { customTrimmed } from "../tools/read-file";
@@ -6,7 +7,7 @@ import { replaceBlock } from "../tools/replace-block";
 import { chat } from "./chat";
 import type { Plan } from "./type";
 
-export async function executePlan(plan: Plan, model: string) {
+export async function executePlan(plan: Plan, model: string, prompt: string) {
   switch (plan.type) {
     case "ask_user":
       return plan.question;
@@ -21,7 +22,8 @@ export async function executePlan(plan: Plan, model: string) {
         path: plan.path,
         name: plan.name,
         instruction: plan.instruction,
-        model: "qwen2.5-coder:3b",
+        model: model,
+        prompt,
       });
 
       return result;
@@ -35,11 +37,20 @@ export async function executePlan(plan: Plan, model: string) {
     case "replaceBlock_function":
       return replaceBlock(plan.content, plan.oldBlock, plan.newBlock);
 
-    default:
-      console.log("unknown type");
-      console.log(plan);
+    case "create_function":
+      return await createFunction({
+        path: plan.path,
+        name: plan.name,
+        instruction: plan.instruciton,
+        model: plan.model,
+        prompt: plan.prompt,
+      });
 
-      return;
+    default:
+      console.log("unknown plan type", plan);
+      return {
+        error: `Unrecognized tool: ${plan}`,
+      };
   }
 }
 

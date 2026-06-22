@@ -69,8 +69,21 @@ export function cleanResponse(text: string) {
     .trim();
 }
 
-```javascript
-function sum(a, b) {
-  return 5;
+export function cleanCode(code: string) {
+  return code
+    .replace(/^```[a-zA-Z]*\n?/, "")
+    .replace(/\n?```$/, "")
+    .trim();
 }
-```
+
+function sum(a: number[], b: number[]): number {
+  if (a.length !== b.length) {
+    throw new Error("Arrays must have the same length");
+  }
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result += a[i] + b[i];
+  }
+  return result;
+}

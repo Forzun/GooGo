@@ -38,4 +38,12 @@ export type Plan =
       content: string;
       oldBlock: string;
       newBlock: string;
+    }
+  | {
+      type: "create_function";
+      path: string;
+      name: string;
+      instruciton: string;
+      model: string;
+      prompt: string;
     };
