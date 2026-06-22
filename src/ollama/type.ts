@@ -20,7 +20,9 @@ export type Plan =
 
       name: string;
 
-      instruction: String;
+      instruction: string;
+
+      model: string;
     }
   | {
       type: "read_file";

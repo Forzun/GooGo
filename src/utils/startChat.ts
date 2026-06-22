@@ -570,12 +570,17 @@ export async function startChat(model: string, theme = "zinc") {
     let assistantContent = "";
 
     try {
-      const result = await runAgent({
+      // const result = await runAgent({
+      //   messages: state.messages.slice(-1),
+      //   model: state.model,
+      // });
+
+      const agent = await runAgent({
         messages: state.messages.slice(-1),
         model: state.model,
       });
 
-      console.log("tool calling message:", result);
+      console.log("tool calling message:", agent);
 
       const stream = await chatResponseStream({
         messages: messageForModels,

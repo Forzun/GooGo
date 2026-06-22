@@ -7,6 +7,8 @@ export async function renameFunction(
 ) {
   const content = await Bun.file(path).text();
 
+  console.log("file here:", content);
+
   const fn = findFunction(content, oldName);
 
   if (!fn) {

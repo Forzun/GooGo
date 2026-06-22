@@ -1,5 +1,8 @@
+import { kMaxLength } from "node:buffer";
 import { chat } from "./chat";
-import { executePlan } from "./planner";
+import { executePlan, Planner } from "./planner";
+import { errorMonitor } from "node:events";
+import { error } from "node:console";
 
 const AGENT_PROMPT = `
   Available tools
@@ -13,15 +16,15 @@ const AGENT_PROMPT = `
 
   Rules
 
-  If you need to inspect a file before deciding,
-  always call read_file first.
+  Files referenced with @path have already been loaded.
 
-  Never assume a function exists.
+  Do not call read_file.
 
-  Never assume a file exists.
+  Choose exactly one tool.
 
-  After receiving tool results,
-  you may call another tool.
+  Return raw JSON only.
+
+  Never wrap JSON in markdown..
 
   Only answer normally if no tools are needed.
 
@@ -31,36 +34,13 @@ const AGENT_PROMPT = `
 
   User
 
-  @utils/filter.ts rename sum to Sum
+  @utils/filter.ts rename sum to Sum function
 
 
   Response
 
   {
-  "type":"tool",
-
-  "tool":"read_file",
-
-  "path":"utils/filter.ts"
-
-  }
-
-
-
-  Tool Result
-
-  export function sum(){
-
-  }
-
-
-
-  Response
-
-  {
-  "type":"tool",
-
-  "tool":"rename_function",
+  "type":"rename_function",
 
   "path":"utils/filter.ts",
 
@@ -69,7 +49,37 @@ const AGENT_PROMPT = `
   "new":"Sum"
 
   }
-`;
+
+
+
+  Tool Result
+
+  export function Sum(){
+
+  }
+
+
+  User
+
+  @utils/filter.ts make sum always return 5
+
+
+  Response
+
+  {
+  "type":"edit_function",
+
+  "path":"utils/filter.ts",
+
+  "name":"sum",
+
+  "instruction":"always return 5"
+
+  }
+
+  Response
+
+  `;
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -92,40 +102,41 @@ export async function runAgent({
     ...messages,
   ];
 
-  while (true) {
-    const response = await chat({
-      messages: working,
-      model: model,
-    });
+  const response = await chat({
+    model: model,
+    messages: working,
+  });
 
-    if (!response) {
-      throw new Error("response not received!");
-    }
+  const cleaned = response!
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-    try {
-      const tool = JSON.parse(response!);
+  if (!response) {
+    throw new Error("no new response");
+  }
 
-      console.log("what tool returning:", tool);
+  try {
+    const plan = JSON.parse(cleaned);
 
-      const result = await executePlan(tool);
+    console.log("parsed plan:");
+    console.log(plan);
 
-      working.push({
-        role: "assistant",
-        content: response,
-      });
+    const result = await executePlan(plan, model);
 
-      working.push({
-        role: "user",
-        content: `Tool Result
-        ${result}`,
-      });
+    console.log("executePlan result:");
+    console.log(result);
 
-      continue;
-    } catch {
-      return {
-        type: "answer",
-        content: response,
-      };
-    }
+    return {
+      type: "tool",
+      result,
+    };
+  } catch (e) {
+    console.log("json parse failed");
+    console.log(e);
+
+    return {
+      type: "chat",
+    };
   }
 }

@@ -69,6 +69,8 @@ export function cleanResponse(text: string) {
     .trim();
 }
 
-function sum(a, b): number {
-  return a + b;
+```javascript
+function sum(a, b) {
+  return 5;
 }
+```

@@ -16,7 +16,8 @@ export function findFunction(name: string, code: string): FoundFunction | null {
   for (const p of patterns) {
     start = code.indexOf(p);
 
-    if (start === -1) {
+    if (start !== -1) {
+      start = start;
       break;
     }
   }
