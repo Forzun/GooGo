@@ -1,3 +1,5 @@
+import type { SelectionRange } from "typescript";
+
 export type Plan =
   | {
       type: "ask_user";
@@ -46,4 +48,12 @@ export type Plan =
       instruction: string;
       model: string;
       prompt: string;
+    }
+  | {
+      type: "modify_function";
+      path: string;
+      name: string;
+      old: string;
+      new: string;
+      instruction: string;
     };

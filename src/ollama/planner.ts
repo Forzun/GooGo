@@ -1,3 +1,4 @@
+import { getEffectiveTypeRoots, isThrowStatement } from "typescript";
 import { createFunction } from "../tools/create-function";
 import { deleteFunction } from "../tools/delete-function";
 import { editFunction } from "../tools/edit-function";
@@ -6,11 +7,36 @@ import { renameFunction } from "../tools/rename-function";
 import { replaceBlock } from "../tools/replace-block";
 import { chat } from "./chat";
 import type { Plan } from "./type";
+import { findFunction } from "../tools/find-function";
 
 export async function executePlan(plan: Plan, model: string, prompt: string) {
   switch (plan.type) {
     case "ask_user":
       return plan.question;
+
+    case "modify_function": {
+      const file = Bun.file(plan.path);
+      const content = await file.text();
+      const exists = findFunction(plan.name, content);
+
+      if (exists) {
+        return await editFunction({
+          path: plan.path,
+          name: plan.name,
+          instruction: plan.instruction,
+          model,
+          prompt,
+        });
+      } else {
+        return await createFunction({
+          path: plan.path,
+          name: plan.name,
+          instruction: plan.instruction,
+          model,
+          prompt,
+        });
+      }
+    }
 
     case "rename_function":
       return await renameFunction(plan.path, plan.old, plan.new);
@@ -128,8 +154,20 @@ export async function Planner(prompt: string, model: string) {
     ],
   });
 
+  if (!response) {
+    return {
+      type: "answer",
+    };
+  }
+
+  const cleaned = response
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
   try {
-    return JSON.parse(response!);
+    const plan = JSON.parse(cleaned);
+    return plan;
   } catch {
     return {
       type: "answer",

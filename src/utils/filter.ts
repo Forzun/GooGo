@@ -90,3 +90,10 @@ function sum(a: number[], b: number[]): number {
   }
   return result;
 }
+
+Here is the new function:
+
+```typescript
+export function randomValueGenerator(): number {
+  return Math.floor(Math.random() * 100);
+}
