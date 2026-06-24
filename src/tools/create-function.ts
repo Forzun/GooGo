@@ -67,7 +67,7 @@ export async function createFunction({
     messages: [
       {
         role: "user",
-        content: prompt,
+        content: agentPrompt,
       },
     ],
   });

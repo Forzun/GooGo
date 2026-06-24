@@ -9,7 +9,7 @@ export async function renameFunction(
 
   console.log("file here:", content);
 
-  const fn = findFunction(content, oldName);
+  const fn = findFunction(oldName, content);
 
   if (!fn) {
     throw Error("not found");
@@ -20,4 +20,9 @@ export async function renameFunction(
   const final = content.replace(fn.source, update);
 
   await Bun.write(path, final);
+
+  return {
+    old: oldName,
+    new: newName,
+  };
 }

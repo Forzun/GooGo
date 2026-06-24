@@ -107,6 +107,7 @@ export async function chat({
       }),
     });
 
+    console.log("message went through chat:");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     if (!response.body) throw new Error(`No response body`);
 

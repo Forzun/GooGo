@@ -43,7 +43,7 @@ export type Plan =
       type: "create_function";
       path: string;
       name: string;
-      instruciton: string;
+      instruction: string;
       model: string;
       prompt: string;
     };

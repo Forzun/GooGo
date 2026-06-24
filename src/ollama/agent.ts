@@ -41,7 +41,9 @@ const AGENT_PROMPT = `
     @utils/filter.ts add a new function
     Response
     {"type":"create_function","path":"utils/filter.ts","name":"newFunction","instruction":"ask the user what the function should do"}
-   `;
+
+
+    `;
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -66,6 +68,7 @@ export async function runAgent({
     ...messages,
   ];
 
+  console.log("message went here:", prompt);
   const response = await chat({
     model: model,
     messages: working,

@@ -19,6 +19,7 @@ import {
 import { prettify } from "./markdown";
 import { runAgent } from "../ollama/agent";
 import { stat } from "fs/promises";
+import { Planner, executePlan } from "../ollama/planner";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
@@ -570,36 +571,45 @@ export async function startChat(model: string, theme = "zinc") {
     let assistantContent = "";
 
     try {
-      // const result = await runAgent({
-      //   messages: state.messages.slice(-1),
-      //   model: state.model,
-      // });
+      const plan = await Planner(finalPrompt, state.model);
 
-      const agent = await runAgent({
-        messages: state.messages.slice(-1),
-        model: state.model,
-        prompt: finalPrompt,
-      });
+      if (plan && plan.type !== "answer") {
+        const result = await executePlan(plan, state.model, finalPrompt);
 
-      console.log("tool calling message:", agent);
+        console.log(result);
 
-      const stream = await chatResponseStream({
-        messages: messageForModels,
-        model: state.model,
-      });
+        let content = `⚙️ **Executed Tool**: \`${plan.type}\`\n`;
+        if (plan.path) content += `· **File**: \`${plan.path}\`\n`;
+        if (plan.name) content += `· **Function**: \`${plan.name}\`\n`;
+        if (plan.instruction)
+          content += `· **Instruction**: ${plan.instruction}\n`;
+        if (plan.old) content += `· **Old**: \`${plan.old}\`\n`;
+        if (plan.new) content += `· **New**: \`${plan.new}\`\n`;
 
-      for await (const token of stream) {
-        assistantContent += token;
         state.messages[state.messages.length - 1] = {
           role: "assistant",
-          content: assistantContent,
+          content,
         };
+        repaint(state);
+      } else {
+        const stream = await chatResponseStream({
+          messages: messageForModels,
+          model: state.model,
+        });
 
-        process.stdout.write(token);
+        for await (const token of stream) {
+          assistantContent += token;
+          state.messages[state.messages.length - 1] = {
+            role: "assistant",
+            content: assistantContent,
+          };
+
+          process.stdout.write(token);
+        }
+
+        console.log("\n");
+        repaint(state);
       }
-
-      console.log("\n");
-      repaint(state);
     } catch (error) {
       state.messages[state.messages.length - 1]!.content =
         "❌ Error: " + (error instanceof Error ? error.message : String(error));

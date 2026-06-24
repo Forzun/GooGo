@@ -83,6 +83,9 @@ function sum(a: number[], b: number[]): number {
 
   let result = 0;
   for (let i = 0; i < a.length; i++) {
+    if (a[i] === undefined || b[i] === undefined) {
+      throw new Error(`Array index ${i} is undefined`);
+    }
     result += a[i] + b[i];
   }
   return result;
