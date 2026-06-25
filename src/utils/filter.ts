@@ -76,24 +76,34 @@ export function cleanCode(code: string) {
     .trim();
 }
 
-function sum(a: number[], b: number[]): number {
-  if (a.length !== b.length) {
-    throw new Error("Arrays must have the same length");
-  }
-
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] === undefined || b[i] === undefined) {
-      throw new Error(`Array index ${i} is undefined`);
-    }
-    result += a[i] + b[i];
-  }
-  return result;
-}
-
-Here is the new function:
-
-```typescript
 export function randomValueGenerator(): number {
   return Math.floor(Math.random() * 100);
+}
+
+export function filterByValue(filters: string[], value: string): string[] {
+  return filters.filter((word) =>
+    word.toLocaleLowerCase().includes(value.toLowerCase()),
+  );
+}
+
+export function filterWithValue(filters: string[], value: string): string[] {
+  return filters.filter((word) =>
+    word.toLocaleLowerCase().includes(value.toLowerCase()),
+  );
+}
+
+export function loadingAnimation(): string[] {
+  const animation: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    animation.push(`Loading... ${i}`);
+  }
+  return animation;
+}
+
+export function isOddEven(num: number): string {
+  if (num % 2 === 0) {
+    return "even";
+  } else {
+    return "odd";
+  }
 }

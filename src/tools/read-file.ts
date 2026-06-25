@@ -73,3 +73,10 @@ export function searchFile(query: string, fiels: string[] = []) {
     )
     .slice(0, 9);
 }
+
+export function writeRandomNumber(): number {
+  const min = 1;
+  const max = 10;
+
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}

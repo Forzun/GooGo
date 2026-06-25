@@ -10,7 +10,7 @@ import {
   type BundledLanguage,
 } from "shiki";
 import { hexToAnsi } from "./Color";
-import { cleanResponse, filterCommand, getFiles } from "./filter";
+import { filterCommand, getFiles } from "./filter";
 import {
   customTrimmed,
   getCurrentFileMention,
@@ -18,13 +18,13 @@ import {
 } from "../tools/read-file";
 import { prettify } from "./markdown";
 import { runAgent } from "../ollama/agent";
-import { stat } from "fs/promises";
 import { Planner, executePlan } from "../ollama/planner";
+import { renderDiff } from "../lib/shiki";
 
 let currentLoader: GooLoader | null = null;
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const HIDE = "\x2b[?25l";
+const HIDE = "\x3b[?25l";
 const SHOW = "\x1b[?25h";
 const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
@@ -69,7 +69,7 @@ interface UIState {
   theme: string;
   sandbox: boolean;
   quotaPct: number;
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: { role: "user" | "assistant"; content: string; row?: boolean }[];
 }
 
 let highlighter: Highlighter | null = null;
@@ -179,8 +179,14 @@ function repaint(state: UIState) {
         w(MUTED + " you  " + R + TEXT + m.content + R + "\n");
       } else {
         w("\n");
-        const rendered = renderMessage(m.content);
-        rendered.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
+
+        if (m.row) {
+          // already formatted (e.g. diff output) — print directly
+          w(m.content + "\n");
+        } else {
+          const rendered = renderMessage(m.content);
+          rendered.split("\n").forEach((l) => w(" " + TEXT + l + R + "\n"));
+        }
         w("\n");
       }
     });
@@ -571,26 +577,44 @@ export async function startChat(model: string, theme = "zinc") {
     let assistantContent = "";
 
     try {
+      await initHighlighter();
+
       const plan = await Planner(finalPrompt, state.model);
 
+      console.log("planning:", plan);
       if (plan && plan.type !== "answer") {
         const result = await executePlan(plan, state.model, finalPrompt);
 
-        console.log(result);
+        if (result && typeof result === "object" && "new" in result) {
+          const diffOutput = await renderDiff({
+            path: plan.path,
+            functionName: plan.name,
+            oldCode: "old" in result ? result.old : null,
+            newCode: result.new,
+          });
 
-        let content = `⚙️ **Executed Tool**: \`${plan.type}\`\n`;
-        if (plan.path) content += `· **File**: \`${plan.path}\`\n`;
-        if (plan.name) content += `· **Function**: \`${plan.name}\`\n`;
-        if (plan.instruction)
-          content += `· **Instruction**: ${plan.instruction}\n`;
-        if (plan.old) content += `· **Old**: \`${plan.old}\`\n`;
-        if (plan.new) content += `· **New**: \`${plan.new}\`\n`;
-
-        state.messages[state.messages.length - 1] = {
-          role: "assistant",
-          content,
-        };
-        repaint(state);
+          state.messages[state.messages.length - 1] = {
+            role: "assistant",
+            content: diffOutput,
+            row: true,
+          };
+          repaint(state);
+        } else if (result && typeof result === "object" && "error" in result) {
+          // handle the error case explicitly
+          state.messages[state.messages.length - 1] = {
+            role: "assistant",
+            content: `❌ ${result.error}`,
+          };
+          repaint(state);
+        } else {
+          // string result (e.g. read_file content) or anything else
+          state.messages[state.messages.length - 1] = {
+            role: "assistant",
+            content:
+              typeof result === "string" ? result : JSON.stringify(result),
+          };
+          repaint(state);
+        }
       } else {
         const stream = await chatResponseStream({
           messages: messageForModels,
