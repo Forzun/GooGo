@@ -92,18 +92,15 @@ export function filterWithValue(filters: string[], value: string): string[] {
   );
 }
 
-export function loadingAnimation(): string[] {
-  const animation: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    animation.push(`Loading... ${i}`);
-  }
-  return animation;
-}
-
 export function isOddEven(num: number): string {
   if (num % 2 === 0) {
     return "even";
   } else {
     return "odd";
   }
+}
+
+export function loading(): boolean {
+  const isRunning = process.pid !== 0;
+  return isRunning;
 }

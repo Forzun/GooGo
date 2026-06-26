@@ -39,6 +39,3 @@ export class SimpleSpinner {
     process.stdout.write(SHOW);
   }
 }
-
-const spinner = new SimpleSpinner("\x1b[36m");
-spinner.start();

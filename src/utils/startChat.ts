@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
-import { input, search } from "@inquirer/prompts";
+import { input } from "@inquirer/prompts";
 import { clearHistory, loadHistory, saveHistory } from "./history";
 import {
   createHighlighter,
@@ -17,11 +17,12 @@ import {
   searchFile,
 } from "../tools/read-file";
 import { prettify } from "./markdown";
-import { runAgent } from "../ollama/agent";
 import { Planner, executePlan } from "../ollama/planner";
 import { renderDiff } from "../lib/shiki";
+import { SimpleSpinner } from "../loaders/light-loader";
 
 let currentLoader: GooLoader | null = null;
+
 const R = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const HIDE = "\x3b[?25l";
@@ -559,9 +560,12 @@ export async function startChat(model: string, theme = "zinc") {
 
     const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
+    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "thinking");
     console.log(userQuestion);
+
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
+    spinner.start();
 
     const messageForModels: { role: "user" | "assistant"; content: string }[] =
       [
@@ -581,9 +585,9 @@ export async function startChat(model: string, theme = "zinc") {
 
       const plan = await Planner(finalPrompt, state.model);
 
-      console.log("planning:", plan);
       if (plan && plan.type !== "answer") {
         const result = await executePlan(plan, state.model, finalPrompt);
+        spinner.stop();
 
         if (result && typeof result === "object" && "new" in result) {
           const diffOutput = await renderDiff({
@@ -621,7 +625,14 @@ export async function startChat(model: string, theme = "zinc") {
           model: state.model,
         });
 
+        let spinnerStopped = false;
+
         for await (const token of stream) {
+          if (!spinnerStopped) {
+            spinner.stop();
+            spinnerStopped = true;
+          }
+
           assistantContent += token;
           state.messages[state.messages.length - 1] = {
             role: "assistant",
@@ -631,10 +642,15 @@ export async function startChat(model: string, theme = "zinc") {
           process.stdout.write(token);
         }
 
+        if (!spinnerStopped) {
+          spinner.stop();
+        }
+
         console.log("\n");
         repaint(state);
       }
     } catch (error) {
+      spinner.stop();
       state.messages[state.messages.length - 1]!.content =
         "❌ Error: " + (error instanceof Error ? error.message : String(error));
       repaint(state);
