@@ -560,7 +560,7 @@ export async function startChat(model: string, theme = "zinc") {
 
     const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
-    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "thinking");
+    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "amber");
     console.log(userQuestion);
 
     state.messages.push({ role: "user", content: trimmed });

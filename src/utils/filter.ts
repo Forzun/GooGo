@@ -100,7 +100,11 @@ export function isOddEven(num: number): string {
   }
 }
 
-export function loading(): boolean {
-  const isRunning = process.pid !== 0;
-  return isRunning;
+export function loadingAnimation(): boolean {
+  const startTime = performance.now();
+  while (performance.now() - startTime < 2000) {
+    process.stdout.write("\rLoading...");
+  }
+  console.log("\nDone!");
+  return true;
 }

@@ -1,4 +1,4 @@
-const HIDE = "\x1b[?25l";
+const HIDE = "\x3b[?25l";
 const SHOW = "\x1b[?25h";
 const CLEAR = "\r\x1b[2K";
 
@@ -22,7 +22,9 @@ export class GooLoader {
     this.timer = setInterval(() => {
       const spinner = FRAMES[this.frame % FRAMES.length];
 
-      process.stdout.write(`${CLEAR}${ZINC}${spinner}${RESET} Goo ${this.text}...`);
+      process.stdout.write(
+        `${CLEAR}${ZINC}${spinner}${RESET} Goo ${this.text}...`,
+      );
 
       this.frame++;
     }, 80);
