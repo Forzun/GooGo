@@ -70,7 +70,7 @@ const WAVE_SHADES = [
   "\x1b[38;2;15;55;58m",
 ];
 
-const WAVE_WIDTH = WAVE_SHADES.length; // how many chars the wave highlight spans
+const WAVE_WIDTH = WAVE_SHADES.length;
 function renderWave(text: string, peak: number): string {
   let out = "";
   const half = Math.floor(WAVE_WIDTH / 2);
