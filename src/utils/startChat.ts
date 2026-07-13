@@ -20,6 +20,9 @@ import { prettify } from "./markdown";
 import { Planner, executePlan } from "../ollama/planner";
 import { renderDiff } from "../lib/shiki";
 import { SimpleSpinner } from "../loaders/light-loader";
+import { searchMemories } from "../memory/search";
+import { nextMemoryId, saveMemory } from "../memory/write";
+import { extractedMemory } from "../memory/extract";
 
 let currentLoader: GooLoader | null = null;
 
@@ -560,6 +563,18 @@ export async function startChat(model: string, theme = "zinc") {
 
     const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
+    let memoryBlock = ""
+    try {
+      const  relevantMemories = await searchMemories(finalPrompt , 5)
+      if (relevantMemories.length > 0) {
+        memoryBlock =
+            "\n\n## What you remember about this user\n" +
+            relevantMemories.map(m => `- ${m.content}`).join("\n");
+        }
+      } catch {
+
+      }
+
     const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "amber");
     console.log(userQuestion);
 
@@ -567,8 +582,14 @@ export async function startChat(model: string, theme = "zinc") {
     repaint(state);
     spinner.start();
 
-    const messageForModels: { role: "user" | "assistant"; content: string }[] =
+    const systemMessage = {
+      role: "system" as const,
+      content:`You are Goo, an AI CLI assistant.${memoryBlock}`,
+    }
+
+    const messageForModels: { role: "user" | "assistant" | "system"; content: string }[] =
       [
+        systemMessage,
         ...state.messages.slice(0, -1),
         {
           role: "user",
@@ -623,6 +644,7 @@ export async function startChat(model: string, theme = "zinc") {
         const stream = await chatResponseStream({
           messages: messageForModels,
           model: state.model,
+          system: systemMessage.content
         });
 
         let spinnerStopped = false;
@@ -654,6 +676,19 @@ export async function startChat(model: string, theme = "zinc") {
       state.messages[state.messages.length - 1]!.content =
         "❌ Error: " + (error instanceof Error ? error.message : String(error));
       repaint(state);
+    }
+
+    if (assistantContent) {
+      try {
+        const extracted = await extractedMemory(trimmed, assistantContent, state.model)
+
+        for (const mem of extracted) {
+          const id = await nextMemoryId();
+          await saveMemory({id, ...mem})
+      }
+      } catch {
+
+      }
     }
 
     await saveHistory(state.messages);

@@ -13,7 +13,7 @@ export interface Memory {
 
 export async function saveMemory(memory: Memory): Promise<void> {
   const now = new Date().toISOString();
-  const fileName = `${memory.id}`;
+  const fileName = `${memory.id}.md`;
   const filePath = join(VAULT_DIR, "Memory", fileName)
 
   const frontmatter = [

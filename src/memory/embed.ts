@@ -4,7 +4,7 @@ export async function embed(text: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-         model: "nomic-embed-text",
+         model: "mxbai-embed-large",
          prompt: text,
        }),
     })

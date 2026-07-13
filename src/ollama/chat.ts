@@ -39,8 +39,9 @@ export async function chatResponseStream({
   messages,
   model,
 }: {
-  messages: { role: "user" | "assistant"; content: string }[];
-  model: string;
+  messages: { role: "user" | "assistant" | "system"; content: string }[];
+    model: string;
+    system?: string
 }) {
   const response = await fetch("http://localhost:11434/api/chat", {
     method: "POST",
@@ -93,16 +94,12 @@ export async function chat({
   try {
     const response = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
-
       headers: {
         "Content-Type": "application/json",
       },
-
       body: JSON.stringify({
         model,
-
         messages,
-
         stream: false,
       }),
     });

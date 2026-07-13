@@ -1,6 +1,7 @@
 import { embed } from "./embed";
 import { Database } from "bun:sqlite"
 import { DB_PATH } from "./init";
+import type { BundledHighlighterOptions } from "shiki";
 
 function cosineSimilarity(a: Float32Array, b: Float32Array): number{
   let dot = 0, magA = 0, magB = 0;
@@ -25,11 +26,12 @@ export async function searchMemories(
   query: string,
   topK = 5,
   threshold = 0.65
-): Promise<SearchResult[]>{
+): Promise<SearchResult[]> {
+  // 1. embed the query using the same model
+  const queryVec = await embed(query);
 
-  const queryVec = await embed(query)
-
-  const db = new Database(DB_PATH)
+  // 2. load all memories from SQLite
+  const db = new Database(DB_PATH);
   const rows = db.query(
     "SELECT id, content, type, tags, embedding FROM memories"
   ).all() as { id: string; content: string; type: string; tags: string; embedding: Buffer }[];
@@ -37,19 +39,22 @@ export async function searchMemories(
 
   if (rows.length === 0) return [];
 
+  // 3. score each memory against the query
   const scored = rows.map(row => {
-    const vec = new Float32Array(row.embedding.buffer)
-    const score = cosineSimilarity(queryVec, vec)
-
+    const buf = row.embedding as Buffer
+    const vec = new Float32Array(buf.buffer , buf.byteOffset , buf.byteLength / 4);
+    const score = cosineSimilarity(queryVec, vec);
     return {
-      id: row.id,
+      id:      row.id,
       content: row.content,
-      type: row.type,
-      tags: JSON.parse(row.tags) as string[],
-      score: score
-    }
-  })
+      type:    row.type,
+      tags:    JSON.parse(row.tags) as string[],
+      score,
+    };
+  });
 
   return scored
-    .filter(r => r.score >=threshold).sort((a , b) => b.score - a.score).slice(0, topK)
+    .filter(r => r.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
 }
