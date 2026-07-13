@@ -20,7 +20,7 @@ export async function initVault() {
 
   // folder is exit or not if not then it create one
   for (const folder of FOLDERS) {
-    await mkdir(folder, {recursive: false})
+    await mkdir(folder, {recursive: true})
   }
 
   console.log("folders created")
@@ -28,14 +28,12 @@ export async function initVault() {
   const db = new Database(DB_PATH);
   db.run(`
      create table if not exists memories (
-       id          text primary key,
-       content     text not null,
-       type        text default 'fact',
-       tags        text default '[]',
-       project     text,
-       embedding   blob not null,
-       created_at  text not null,
-       file_path   text not null
+     id           TEXT PRIMARY KEY,   -- "memory-001-chunk-0"
+     file_path    TEXT NOT NULL,      -- "/home/bhavesh/.goo/vault/Memory/memory-001.md"
+     chunk_index  INTEGER NOT NULL,   -- 0 for short files, 0,1,2... for long ones
+     embedding    BLOB NOT NULL,
+     file_hash    TEXT NOT NULL,      -- MD5/SHA of file content at index time
+     updated_at   TEXT NOT NULL
      )
    `);
 db.close()

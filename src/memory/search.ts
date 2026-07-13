@@ -2,6 +2,7 @@ import { embed } from "./embed";
 import { Database } from "bun:sqlite"
 import { DB_PATH } from "./init";
 import type { BundledHighlighterOptions } from "shiki";
+import { hash } from "bun";
 
 function cosineSimilarity(a: Float32Array, b: Float32Array): number{
   let dot = 0, magA = 0, magB = 0;
@@ -20,6 +21,14 @@ export interface SearchResult {
   type: string;
   tags: string[];
   score: number
+}
+
+export async function isStale(row: { file_path: string, file_hash: string | bigint }): Promise<boolean> {
+  const file = Bun.file(row.file_path)
+  if (!(await file.exists())) return true;
+  const content = await file.text();
+  const currentHash = hash(content);
+  return currentHash !== row.file_hash
 }
 
 export async function searchMemories(

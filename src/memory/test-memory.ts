@@ -24,6 +24,10 @@ console.log("✓ vault initialized");
 //   await saveMemory({ id, ...mem as any });
 //   console.log(`✓ saved ${id}: ${mem.content.slice(0, 40)}...`);
 // }
+//
+//1. not store memory in SQLite
+//2. every information have its own chunks
+//3.
 
 console.log("2. Embedding");
 const vec = await embed("the user prefers TypeScript");
