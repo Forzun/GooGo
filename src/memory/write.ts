@@ -4,7 +4,7 @@ import { DB_PATH, VAULT_DIR } from "./init";
 import { embed } from "./embed";
 import type { Message } from "../providers/type";
 import { chat } from "../ollama/chat";
-import{ indexFile } from "./search";
+import{ indexFile } from "./index.file";
 
 export interface Memory {
   id: string;
