@@ -27,15 +27,16 @@ export async function initVault() {
 
   const db = new Database(DB_PATH);
   db.run(`
-     create table if not exists memories (
-     id           TEXT PRIMARY KEY,   -- "memory-001-chunk-0"
-     file_path    TEXT NOT NULL,      -- "/home/bhavesh/.goo/vault/Memory/memory-001.md"
-     chunk_index  INTEGER NOT NULL,   -- 0 for short files, 0,1,2... for long ones
-     embedding    BLOB NOT NULL,
-     file_hash    TEXT NOT NULL,      -- MD5/SHA of file content at index time
-     updated_at   TEXT NOT NULL
-     )
-   `);
+    CREATE TABLE IF NOT EXISTS chunks (
+      id           TEXT PRIMARY KEY,      -- "memory-001-0", "bhavesh-0", "googo-1"
+      file_path    TEXT NOT NULL,
+      chunk_index  INTEGER NOT NULL,
+      embedding    BLOB NOT NULL,
+      file_hash    TEXT NOT NULL,         -- detect stale entries
+      updated_at   TEXT NOT NULL,
+      UNIQUE(file_path, chunk_index)      -- one row per chunk per file
+    )
+  `);
 db.close()
 
 console.log("data base created")

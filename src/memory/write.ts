@@ -2,6 +2,9 @@ import { Database } from "bun:sqlite"
 import { join } from "node:path"
 import { DB_PATH, VAULT_DIR } from "./init";
 import { embed } from "./embed";
+import type { Message } from "../providers/type";
+import { chat } from "../ollama/chat";
+import{ indexFile } from "./search";
 
 export interface Memory {
   id: string;
@@ -9,6 +12,33 @@ export interface Memory {
   type: "preference" | "fact" | "project" | "person" | "decision" | "error";
   tags: string[]
   project?: string
+}
+
+
+async function writeDailySummary(messages: Message[], model: string) {
+ // we need to find today existing file and re-edit it i do open the cli later
+  const today = new Date().toISOString().split("T")[0];
+  const filePath = join(VAULT_DIR , "Daily" , `${today}.md`)
+
+  const conversation = messages.map(m => `${m.role}: ${m.content.slice(0 , 200)}`).join("\n")
+
+  const summary = await chat({
+    model,
+    messages: [
+      {
+        role: "user",
+        content: `Summarize this conversation in 3-5 bullet points, focusing on what was accomplished, decided, or learned:\n\n${conversation}`
+      }
+    ]
+  })
+
+  const file = Bun.file(filePath)
+  const existing = await file.exists() ? await file.text() : " ";
+
+  const entry = `\n\n## Session ${new Date().toLocaleTimeString()}\n${summary}`
+  await Bun.write(file, existing + entry)
+
+  await indexFile(filePath)
 }
 
 export async function saveMemory(memory: Memory): Promise<void> {
