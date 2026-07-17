@@ -21,8 +21,11 @@ import { Planner, executePlan } from "../ollama/planner";
 import { renderDiff } from "../lib/shiki";
 import { SimpleSpinner } from "../loaders/light-loader";
 import { searchMemories } from "../memory/search";
-import { nextMemoryId, saveMemory } from "../memory/write";
+import { nextMemoryId, saveMemory, writeDailySummary } from "../memory/write";
 import { extractedMemory } from "../memory/extract";
+import { Database } from "bun:sqlite"
+import { DB_PATH } from "../memory/init";
+import { stat } from "fs/promises";
 
 let currentLoader: GooLoader | null = null;
 
@@ -451,6 +454,8 @@ export async function startChat(model: string, theme = "zinc") {
   repaint(state);
 
   process.on("SIGINT", () => {
+    // saving daily summary Ctrl+c too
+    writeDailySummary(state.messages, model).catch(() => {})
     w(SHOW + "\n");
     process.exit(0);
   });
@@ -486,6 +491,45 @@ export async function startChat(model: string, theme = "zinc") {
       });
       repaint(state);
       continue;
+    }
+
+    if (trimmed === "/memory") {
+      try {
+        const db = new Database(DB_PATH)
+        const rows = db.query(
+          `SELECT id, file_path, chunk_index
+          FROM chunks
+          ORDER BY updated_at DESC
+          LIMIT 20`
+        ).all() as { id: string, file_path: string, chunk_index: number }[]
+
+        if (!rows.length) {
+          state.messages.push({
+            role: "assistant",
+            content: "No memories yet. Keep chatting and I'll start remembering things.",
+          })
+        } else {
+          const lines: string[] = [`I remember ${rows.length} things about you:\n`];
+          for (const row of rows) {
+            try {
+            const raw = await Bun.file(row.file_path).text()
+            const body = raw.replace(/^---[\s\S]*?---\n/, "").trim();
+            const firstLine = body.split("\n")[0] ?? "";
+            lines.push(`· ${firstLine}`);
+            } catch {
+
+            }
+          }
+          state.messages.push({ role: "assistant", content: lines.join("\n") })
+        }
+      } catch {
+        state.messages.push({
+          role: "assistant",
+          content: "Could not load memories.",
+        })
+      }
+      repaint(state);
+      continue
     }
 
     if (trimmed === "/history") {
@@ -536,6 +580,7 @@ export async function startChat(model: string, theme = "zinc") {
     }
 
     if (trimmed === "/exit" || trimmed === "/quit") {
+      await writeDailySummary(state.messages, model).catch(() => { });
       w(CLEAR_SCREEN + SHOW);
       break;
     }
@@ -678,6 +723,7 @@ export async function startChat(model: string, theme = "zinc") {
       repaint(state);
     }
 
+    // memory extraction
     if (assistantContent) {
       try {
         const extracted = await extractedMemory(trimmed, assistantContent, state.model)
@@ -686,9 +732,7 @@ export async function startChat(model: string, theme = "zinc") {
           const id = await nextMemoryId();
           await saveMemory({id, ...mem})
       }
-      } catch {
-
-      }
+      } catch { }
     }
 
     await saveHistory(state.messages);

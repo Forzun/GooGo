@@ -20,6 +20,7 @@ export interface SearchResult {
   type?: string;
   tags?: string[];
   score: number
+  file_path: string
 }
 
 
