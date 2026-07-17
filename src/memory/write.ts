@@ -5,6 +5,7 @@ import { embed } from "./embed";
 import type { Message } from "../providers/type";
 import { chat } from "../ollama/chat";
 import{ indexFile } from "./index.file";
+import { measureMemory } from "node:vm";
 
 export interface Memory {
   id: string;
@@ -56,8 +57,32 @@ export async function saveMemory(memory: Memory): Promise<void> {
     "---",
     ].filter(Boolean).join("\n")
 
-  await Bun.write(filePath, `${frontmatter}\n\n${memory.content}\n`)
+  const links: string[] = []
 
+  if (memory.project) {
+    links.push(`[[Projects/${memory.project}]]`)
+  }
+
+  if (memory.type === "preference"){
+    links.push(`[[Preference/Index]]`)
+  }
+
+  if (memory.type === "person") {
+    const nameMatch = memory.content.match(/(?:name is|called|named)\s+([A-Z][a-z]+)/)
+    if (nameMatch) links.push(`[[People/${nameMatch[1]}]]`)
+  }
+
+  for (const tag of memory.tags) {
+    links.push(`[[tags/${tag}]]`)
+  }
+
+  const linkLine = links.length > 0 ? `\n\nRelated: ${links.join("  ")}` : ""
+  const tagLine = memory.tags.map(t => `#${t}`).join(" ");
+
+  await Bun.write(
+    filePath,
+    `${frontmatter}\n\n${memory.content}${linkLine}\n\n${tagLine}\n`
+  )
   await indexFile(filePath)
 }
 
