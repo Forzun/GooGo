@@ -1,4 +1,3 @@
-import { isYieldExpression } from "typescript";
 import { chat } from "../ollama/chat";
 
 const EXTRACT_PROMPT = `
