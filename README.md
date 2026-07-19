@@ -1,5 +1,10 @@
-<center>![Image Description](/assests/GooIcon.svg) </center>
-<center>Goo Cli</center>
+<div align="center">
+
+![Image Description](/assets/GooIcon.svg)
+
+### Goo Cli
+
+</div>
 
 # GooGo
 
