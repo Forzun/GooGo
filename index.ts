@@ -1,1 +1,1 @@
-console.log("Hello via Bun!");
+console.log("Goo cli please to do src/index.ts");

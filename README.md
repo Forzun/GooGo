@@ -1,7 +1,10 @@
-<center>![Image Description](/assests/GooIcon.svg) </center>
-<center>Goo Cli</center>
+<div align="center">
 
-# GooGo
+![Image Description](./assests/GooCli.svg)
+
+### Goo Cli
+
+</div># GooGo
 
 > A local-first, open-source AI coding assistant for your terminal — powered by Ollama, with file-aware conversations, code editing, and persistent memory you actually own.
 
