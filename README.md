@@ -1,6 +1,6 @@
 <div align="center">
 
-![Image Description](./assests/GooCli.svg)
+![Image Description](./assests/GooIcon.svg)
 
 ### Goo Cli
 
