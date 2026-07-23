@@ -127,8 +127,6 @@ export class SimpleSpinner {
   }
 
   start() {
-    process.stdout.write(HIDE);
-
     this.timer = setInterval(() => {
       const spinner = FRAMES[this.frame % FRAMES.length];
       const label = `Loading`;

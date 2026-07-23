@@ -7,7 +7,7 @@ const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "
 const ZINC = "\x1b[38;2;161;161;170m";
 const RESET = "\x1b[0m";
 
-export class GooLoader {
+export class MessageLoader {
   private timer: NodeJS.Timeout | null = null;
   private frame = 0;
   private text: string;

@@ -25,7 +25,6 @@ import { nextMemoryId, saveMemory, writeDailySummary } from "../memory/write";
 import { extractedMemory } from "../memory/extract";
 import { Database } from "bun:sqlite"
 import { DB_PATH } from "../memory/init";
-import { stat } from "fs/promises";
 
 let currentLoader: GooLoader | null = null;
 
@@ -387,10 +386,10 @@ function readLine(theme: string): Promise<string> {
 
       if (key === "\r" || key === "\n") {
         clearSuggestions();
-        w("\x1b[2B" + HIDE);
+        w("\x1b[2B");
         cleanup();
         resolve(value);
-        return;
+        return
       }
 
       if (key === "\x03") {
@@ -725,16 +724,17 @@ export async function startChat(model: string, theme = "zinc") {
 
     // memory extraction
     if (assistantContent) {
-      try {
-        const extracted = await extractedMemory(trimmed, assistantContent, state.model)
+      void (async() => {
+        try {
+          const extracted = await extractedMemory(trimmed, assistantContent, state.model)
 
-        for (const mem of extracted) {
-          const id = await nextMemoryId();
-          await saveMemory({id, ...mem})
-      }
-      } catch { }
+          for (const mem of extracted) {
+            const id = await nextMemoryId();
+            await saveMemory({id, ...mem})
+          }
+        } catch(error) { }
+      })()
     }
-
     await saveHistory(state.messages);
   }
 }
