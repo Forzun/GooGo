@@ -692,7 +692,6 @@ export async function startChat(model: string, theme = "zinc") {
           repaint(state);
         } else {
           // string result (e.g. read_file content) or anything else
-          spinner.setLabel("Search in obsidian...");
           state.messages[state.messages.length - 1] = {
             role: "assistant",
             content:

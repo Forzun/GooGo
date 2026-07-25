@@ -102,7 +102,7 @@ export function isOddEven(num: number): string {
 
 export function loadingAnimation(): boolean {
   const startTime = performance.now();
-  while (performance.now() - startTime < 2000) {
+  for (let i = 0; i < 20; i++) {
     process.stdout.write("\rLoading...");
   }
   console.log("\nDone!");

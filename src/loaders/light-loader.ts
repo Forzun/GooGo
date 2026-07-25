@@ -1,11 +1,11 @@
-const HIDE = "\x1b[?25l";
-const SHOW = "\x1b[?25h";
+const HIDE  = "\x1b[?25l";
+const SHOW  = "\x1b[?25h";
 const CLEAR = "\r\x1b[2K";
+const RESET = "\x1b[0m";
+const BOLD  = "\x1b[1m";
+const DIM   = "\x1b[2m";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-const ZINC = "\x1b[38;2;161;161;170m";
-const RESET = "\x1b[0m";
 
 type ThemeName = "zinc" | "green" | "cyan" | "amber";
 
@@ -60,115 +60,151 @@ const THEMES: Record<ThemeName, { spinner: string; wave: string[] }> = {
   },
 };
 
-const WAVE_SHADES = [
-  "\x1b[38;2;15;55;58m",
-  "\x1b[38;2;30;95;100m",
-  "\x1b[38;2;50;145;152m",
-  "\x1b[38;2;110;230;238m", // bright cyan peak
-  "\x1b[38;2;50;145;152m",
-  "\x1b[38;2;30;95;100m",
-  "\x1b[38;2;15;55;58m",
+// ── Word entry animation ───────────────────────────────────────────────────────
+// Each word rises from "invisible" → "dim" → "normal" → "bright+bold" → "normal"
+// We fake -y → y by going through brightness stages over 4 ticks per word.
+// stages: 0=hidden, 1=very dim, 2=dim, 3=normal, 4=bright pop, 5=settled
+const RISE_STAGES = [
+  "\x1b[38;2;50;50;55m",    // stage 1 — barely visible (bottom of rise)
+  "\x1b[38;2;100;100;108m", // stage 2 — dim
+  "\x1b[38;2;160;160;168m", // stage 3 — coming in
+  BOLD,                      // stage 4 — bright pop at top
+  RESET,                     // stage 5 — settled (wave takes over)
 ];
+const RISE_TICKS = 3; // ticks per stage
 
-
-const WAVE_WIDTH = WAVE_SHADES.length;
-function renderWave(text: string, peak: number): string {
-  let out = "";
-  const half = Math.floor(WAVE_WIDTH / 2);
-
-  for (let i = 0; i < text.length; i++) {
-    const dist = i - peak; // distance from this char to the wave's peak
-    let shadeIdx = half - dist; // map distance to shade array index
-
-    let color: string;
-    if (shadeIdx >= 0 && shadeIdx < WAVE_WIDTH) {
-      color = WAVE_SHADES[shadeIdx]!;
-    } else {
-      color = ZINC; // default resting color outside the wave's influence
-    }
-
-    out += color + text[i];
-  }
-
-  return out + RESET;
+interface WordState {
+  word: string;
+  stage: number;   // 0..5
+  tick:  number;   // counts up to RISE_TICKS then advances stage
 }
 
 export class SimpleSpinner {
-  private timer: NodeJS.Timeout | null = null;
-  private frame = 0;
-  private wavePos = 0;
-  private text: string;
+  private spinTimer: NodeJS.Timeout | null = null;
+  private frame    = 0;
+  private wavePos  = 0;
+
+  private words: WordState[] = [];   // settled words (fully risen)
+  private rising: WordState[] = [];  // words currently animating in
+  private pendingWords: string[] = []; // words queued to start rising
+
   private theme: { spinner: string; wave: string[] };
+  private themeName: ThemeName;
 
   constructor(text = "Loading...", themeName: ThemeName = "zinc") {
-    this.text = text;
-    this.theme = THEMES[themeName];
+    this.themeName = themeName;
+    this.theme     = THEMES[themeName];
+    // seed initial label as already settled
+    this.words = text.split(" ").map((w) => ({ word: w, stage: 5, tick: 0 }));
   }
 
-  setLabel(text: string) {
-    this.text = text;
-  }
-
+  // ── Wave render on settled text ─────────────────────────────────────────────
   private renderWave(text: string, peak: number): string {
     const shades = this.theme.wave;
-    const half = Math.floor(shades.length / 2);
+    const half   = Math.floor(shades.length / 2);
     let out = "";
-
     for (let i = 0; i < text.length; i++) {
-      const dist = i - peak;
-      const shadeIdx = half - dist;
-      const color =
-        shadeIdx >= 0 && shadeIdx < shades.length
-          ? shades[shadeIdx]!
-          : this.theme.spinner;
+      const shadeIdx = half - (i - peak);
+      const color    = shadeIdx >= 0 && shadeIdx < shades.length
+        ? shades[shadeIdx]! : this.theme.spinner;
       out += color + text[i];
     }
-
     return out + RESET;
   }
 
-  start(label?: string) {
-    if (label !== undefined && label.trim() !== "") {
-      this.text = label;
-    }
-    this.timer = setInterval(() => {
-      const spinner = FRAMES[this.frame % FRAMES.length];
+  // ── Build the full display line ─────────────────────────────────────────────
+  private buildLine(): string {
+    const parts: string[] = [];
+
+    // settled words — run wave over them as one joined string
+    const settledText = this.words.map((w) => w.word).join(" ");
+    if (settledText) {
       const half = Math.floor(this.theme.wave.length / 2);
-      const wave = this.renderWave(this.text, this.wavePos - half);
+      parts.push(this.renderWave(settledText, this.wavePos - half));
+    }
 
-      process.stdout.write(
-        `${CLEAR}${this.theme.spinner}${spinner}${RESET} ${wave}`,
-      );
+    // rising words — each gets its own stage color, no wave yet
+    for (const rw of this.rising) {
+      const stageColor = rw.stage === 4
+        ? BOLD + "\x1b[38;2;255;255;255m"  // bright white pop
+        : RISE_STAGES[Math.min(rw.stage - 1, RISE_STAGES.length - 1)] ?? this.theme.spinner;
+      parts.push(stageColor + rw.word + RESET);
+    }
 
+    return parts.join(" ");
+  }
+
+  // ── Tick: advance rising animations ─────────────────────────────────────────
+  private tick() {
+    // start queued words one at a time (stagger by checking if last rising is past stage 2)
+    if (this.pendingWords.length > 0) {
+      const canStart = this.rising.length === 0
+        || this.rising[this.rising.length - 1]!.stage >= 2;
+      if (canStart) {
+        const word = this.pendingWords.shift()!;
+        this.rising.push({ word, stage: 1, tick: 0 });
+      }
+    }
+
+    // advance each rising word
+    for (const rw of this.rising) {
+      rw.tick++;
+      if (rw.tick >= RISE_TICKS) {
+        rw.tick = 0;
+        rw.stage++;
+      }
+    }
+
+    // graduate fully risen words to settled
+    const done = this.rising.filter((rw) => rw.stage >= 5);
+    if (done.length > 0) {
+      this.words.push(...done);
+      this.rising = this.rising.filter((rw) => rw.stage < 5);
+    }
+
+    // advance wave position
+    const totalLen = this.words.map((w) => w.word).join(" ").length;
+    this.wavePos = (this.wavePos + 1) % (totalLen + this.theme.wave.length || 1);
+  }
+
+  // ── Public API ──────────────────────────────────────────────────────────────
+  setLabel(text: string) {
+    // replace everything: clear settled + rising, queue new words to rise in
+    this.words   = [];
+    this.rising  = [];
+    this.pendingWords = text.split(" ").filter(Boolean);
+    this.wavePos = 0;
+  }
+
+  start(initialLabel?: string) {
+    if (initialLabel && initialLabel.trim()) this.setLabel(initialLabel);
+
+    process.stdout.write(HIDE);
+
+    this.spinTimer = setInterval(() => {
+      this.tick();
+      const spinner = FRAMES[this.frame % FRAMES.length]!;
+      const line    = this.buildLine();
+      process.stdout.write(`${CLEAR}${this.theme.spinner}${spinner}${RESET} ${line}`);
       this.frame++;
-      this.wavePos =
-        (this.wavePos + 1) % (this.text.length + this.theme.wave.length);
-    }, 250);
+    }, 60);
 
     return this;
   }
 
   stop(message = "Done") {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-    process.stdout.write(
-      `${CLEAR}${this.theme.spinner}✓${RESET} ${message}\n${SHOW}`,
-    );
+    if (this.spinTimer) { clearInterval(this.spinTimer); this.spinTimer = null; }
+    process.stdout.write(`${CLEAR}${this.theme.spinner}✓${RESET} ${message}\n${SHOW}`);
   }
-
 }
 
+// ── Demo ──────────────────────────────────────────────────────────────────────
 if (import.meta.main) {
-  const loader = new SimpleSpinner("thinking").start(" ");
+  const loader = new SimpleSpinner("thinking...", "cyan").start();
 
   setTimeout(() => loader.setLabel("fetching models"), 2000);
   setTimeout(() => loader.setLabel("almost done"), 4000);
-  setTimeout(() => loader.stop("models loaded"), 6000);
+  setTimeout(() => loader.stop("models loaded ✓"), 6000);
 
-  process.on("SIGINT", () => {
-    loader.stop("cancelled");
-    process.exit(0);
-  });
+  process.on("SIGINT", () => { loader.stop("cancelled"); process.exit(0); });
 }
