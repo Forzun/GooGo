@@ -1,4 +1,4 @@
-const HIDE = "\x3b[?25l";
+const HIDE = "\x1b[?25l";
 const SHOW = "\x1b[?25h";
 const CLEAR = "\r\x1b[2K";
 
@@ -70,6 +70,7 @@ const WAVE_SHADES = [
   "\x1b[38;2;15;55;58m",
 ];
 
+
 const WAVE_WIDTH = WAVE_SHADES.length;
 function renderWave(text: string, peak: number): string {
   let out = "";
@@ -126,12 +127,14 @@ export class SimpleSpinner {
     return out + RESET;
   }
 
-  start() {
+  start(label?: string) {
+    if (label !== undefined && label.trim() !== "") {
+      this.text = label;
+    }
     this.timer = setInterval(() => {
       const spinner = FRAMES[this.frame % FRAMES.length];
-      const label = `Loading`;
       const half = Math.floor(this.theme.wave.length / 2);
-      const wave = this.renderWave(label, this.wavePos - half);
+      const wave = this.renderWave(this.text, this.wavePos - half);
 
       process.stdout.write(
         `${CLEAR}${this.theme.spinner}${spinner}${RESET} ${wave}`,
@@ -139,7 +142,7 @@ export class SimpleSpinner {
 
       this.frame++;
       this.wavePos =
-        (this.wavePos + 1) % (label.length + this.theme.wave.length);
+        (this.wavePos + 1) % (this.text.length + this.theme.wave.length);
     }, 250);
 
     return this;
@@ -151,13 +154,14 @@ export class SimpleSpinner {
       this.timer = null;
     }
     process.stdout.write(
-      `${CLEAR}${this.theme.spinner}✓${RESET} Goo ${message}\n${SHOW}`,
+      `${CLEAR}${this.theme.spinner}✓${RESET} ${message}\n${SHOW}`,
     );
   }
+
 }
 
 if (import.meta.main) {
-  const loader = new SimpleSpinner("thinking").start();
+  const loader = new SimpleSpinner("thinking").start(" ");
 
   setTimeout(() => loader.setLabel("fetching models"), 2000);
   setTimeout(() => loader.setLabel("almost done"), 4000);

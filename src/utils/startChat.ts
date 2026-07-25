@@ -386,9 +386,12 @@ function readLine(theme: string): Promise<string> {
 
       if (key === "\r" || key === "\n") {
         clearSuggestions();
+        const loader = new SimpleSpinner("", "zinc")
+        loader.start("");
         w("\x1b[2B");
         cleanup();
         resolve(value);
+        loader.stop("");
         return
       }
 
@@ -454,8 +457,8 @@ export async function startChat(model: string, theme = "zinc") {
 
   process.on("SIGINT", () => {
     // saving daily summary Ctrl+c too
-    writeDailySummary(state.messages, model).catch(() => {})
     w(SHOW + "\n");
+    writeDailySummary(state.messages, model).catch(() => {})
     process.exit(0);
   });
 
@@ -579,10 +582,21 @@ export async function startChat(model: string, theme = "zinc") {
     }
 
     if (trimmed === "/exit" || trimmed === "/quit") {
-      await writeDailySummary(state.messages, model).catch(() => { });
+      const loader = new SimpleSpinner("Wait saving your data...", "zinc")
+      loader.start(" ")
+
+      try {
+        await writeDailySummary(state.messages, model).catch(() => { });
+        loader.stop("saved!")
+      } catch {
+        loader.stop("failed")
+      }
+
       w(CLEAR_SCREEN + SHOW);
+      console.log("👋 Goodbye!");
       break;
     }
+
     if (trimmed === "/clear") {
       state.messages = [];
       clearHistory();
@@ -605,6 +619,9 @@ export async function startChat(model: string, theme = "zinc") {
       continue;
     }
 
+    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "zinc");
+    spinner.start("Thinking...");
+
     const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
     let memoryBlock = ""
@@ -619,17 +636,16 @@ export async function startChat(model: string, theme = "zinc") {
 
       }
 
-    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "amber");
-    console.log(userQuestion);
+      spinner.setLabel("searching...")
 
     state.messages.push({ role: "user", content: trimmed });
     repaint(state);
-    spinner.start();
 
     const systemMessage = {
       role: "system" as const,
       content:`You are Goo, an AI CLI assistant.${memoryBlock}`,
     }
+
 
     const messageForModels: { role: "user" | "assistant" | "system"; content: string }[] =
       [
@@ -644,15 +660,14 @@ export async function startChat(model: string, theme = "zinc") {
     state.messages.push({ role: "assistant", content: "" });
 
     let assistantContent = "";
-
     try {
       await initHighlighter();
 
+      spinner.setLabel("Planning...");
       const plan = await Planner(finalPrompt, state.model);
 
       if (plan && plan.type !== "answer") {
         const result = await executePlan(plan, state.model, finalPrompt);
-        spinner.stop();
 
         if (result && typeof result === "object" && "new" in result) {
           const diffOutput = await renderDiff({
@@ -677,6 +692,7 @@ export async function startChat(model: string, theme = "zinc") {
           repaint(state);
         } else {
           // string result (e.g. read_file content) or anything else
+          spinner.setLabel("Search in obsidian...");
           state.messages[state.messages.length - 1] = {
             role: "assistant",
             content:
@@ -685,6 +701,7 @@ export async function startChat(model: string, theme = "zinc") {
           repaint(state);
         }
       } else {
+        spinner.setLabel("Generating response...");
         const stream = await chatResponseStream({
           messages: messageForModels,
           model: state.model,
@@ -695,7 +712,7 @@ export async function startChat(model: string, theme = "zinc") {
 
         for await (const token of stream) {
           if (!spinnerStopped) {
-            spinner.stop();
+            spinner.stop("");
             spinnerStopped = true;
           }
 
