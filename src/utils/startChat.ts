@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
 import { pullModel } from "../ollama/pull-models";
-import { input } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
 import { clearHistory, loadHistory, saveHistory } from "./history";
 import {
   createHighlighter,
@@ -25,6 +25,7 @@ import { nextMemoryId, saveMemory, writeDailySummary } from "../memory/write";
 import { extractedMemory } from "../memory/extract";
 import { Database } from "bun:sqlite"
 import { DB_PATH } from "../memory/init";
+import { getInstalledModels } from "../ui/setup";
 
 let currentLoader: GooLoader | null = null;
 
@@ -72,6 +73,7 @@ function gitBranch(): string {
 
 interface UIState {
   model: string;
+  plannerModel?: string;
   theme: string;
   sandbox: boolean;
   quotaPct: number;
@@ -163,11 +165,12 @@ function renderMessage(content: string): string {
 }
 
 function repaint(state: UIState) {
-  const { model, theme, sandbox, quotaPct, messages } = state;
+  const { model, theme, sandbox, quotaPct, messages , plannerModel } = state;
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~");
   const branch = gitBranch();
   const C = cols();
   const accent = THEME_COLORS[theme] ?? MUTED;
+  const modelDisplay = `${model} / ${plannerModel}`;
 
   w(CLEAR_SCREEN);
 
@@ -215,7 +218,7 @@ function repaint(state: UIState) {
       (sandbox ? "sandbox" : "no sandbox").padEnd(widths[2]!) +
       R,
   );
-  w(TEXT + model.padEnd(widths[3]!) + R);
+  w(TEXT + modelDisplay.padEnd(widths[3]!) + R);
   w(OK + quotaPct + "% used" + R);
   w("\n");
 
@@ -238,7 +241,8 @@ function repaint(state: UIState) {
   w(blankRow);
   w(inputRow);
   w(blankRow);
-}
+
+ }
 
 function midLine(value: string, theme: string): string {
   const C = cols();
@@ -443,8 +447,9 @@ function readLine(theme: string): Promise<string> {
   });
 }
 
-export async function startChat(model: string, theme = "zinc") {
+export async function startChat(model: string, theme = "zinc", plannerModel:string) {
   const state: UIState = {
+    plannerModel,
     model,
     theme,
     sandbox: false,
@@ -604,8 +609,36 @@ export async function startChat(model: string, theme = "zinc") {
       continue;
     }
 
+    if (trimmed === "/plannerModel") {
+        const installed = getInstalledModels();
+
+        // stop stdin raw mode so inquirer can work
+        w(SHOW)
+
+      const newPlanner = await select({
+        message: "Select new planner model",
+        choices: installed?.map(m => ({
+          value: m,
+          name:m === state.plannerModel ? `${m}  ← current` : m,
+        }))
+        })
+
+      w(HIDE)
+
+      state.plannerModel = newPlanner
+
+      state.messages.push({
+        role: "assistant",
+        content: `✓ Planner model changed to ${newPlanner}`,
+      })
+      repaint(state)
+      continue;
+    }
+
     if (trimmed === "/model") {
-      state.messages.push({ role: "assistant", content: `Model: ${model}` });
+      state.messages.push({ role: "assistant",
+        content: `Response model:  ${state.model}\nPlanner model:   ${state.plannerModel}`,
+ });
       repaint(state);
       continue;
     }
@@ -619,7 +652,7 @@ export async function startChat(model: string, theme = "zinc") {
       continue;
     }
 
-    const spinner = new SimpleSpinner("\x1b[38;2;251;146;60m", "zinc");
+    const spinner = new SimpleSpinner("\x2b[38;2;251;146;60m", "zinc");
     spinner.start("Thinking...");
 
     const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
@@ -664,7 +697,7 @@ export async function startChat(model: string, theme = "zinc") {
       await initHighlighter();
 
       spinner.setLabel("Planning...");
-      const plan = await Planner(finalPrompt, state.model);
+      const plan = await Planner(finalPrompt, state?.plannerModel ?? "");
 
       if (plan && plan.type !== "answer") {
         const result = await executePlan(plan, state.model, finalPrompt);
@@ -677,6 +710,7 @@ export async function startChat(model: string, theme = "zinc") {
             newCode: result.new,
           });
 
+          spinner.stop("Goo done:")
           state.messages[state.messages.length - 1] = {
             role: "assistant",
             content: diffOutput,

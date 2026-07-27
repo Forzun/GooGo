@@ -140,37 +140,41 @@ Response: {"type":"answer"}
 Return ONLY the JSON object.
 `;
 export async function Planner(prompt: string, model: string) {
-  const response = await chat({
-    model: model,
-    messages: [
-      {
-        role: "system",
-        content: PLANNER_PROMPT,
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
-
-  if (!response) {
-    return {
-      type: "answer",
-    };
-  }
-
-  const cleaned = response
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
-
   try {
-    const plan = JSON.parse(cleaned);
-    return plan;
-  } catch {
-    return {
-      type: "answer",
-    };
+    const response = await chat({
+      model: model,
+      messages: [
+        {
+          role: "system",
+          content: PLANNER_PROMPT,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    if (!response) {
+      return {
+        type: "answer",
+      };
+    }
+
+    const cleaned = response
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    try {
+      const plan = JSON.parse(cleaned);
+      return plan;
+    } catch {
+      return {
+        type: "answer",
+      };
+    }
+  } catch (error) {
+    throw new Error("model is not working please check in it running or not"+ error)
   }
 }
