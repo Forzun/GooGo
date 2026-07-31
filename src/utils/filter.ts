@@ -108,3 +108,19 @@ export function loadingAnimation(): boolean {
   console.log("\nDone!");
   return true;
 }
+
+export function loaderFunction(): string[] {
+  const startTime = performance.now();
+  const loadingTexts: string[] = [];
+  for (let i = 0; i < 20; i++) {
+    const text = "\rLoading...";
+    process.stdout.write(text);
+    loadingTexts.push(text);
+  }
+  console.log(`\nDone! (Loaded in ${performance.now() - startTime}ms)`);
+  return loadingTexts;
+}
+
+export function countTwoNumbers(a: number, b: number): number {
+  return a + b;
+}

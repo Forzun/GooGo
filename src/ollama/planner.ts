@@ -55,7 +55,12 @@ export async function executePlan(plan: Plan, model: string, prompt: string) {
       return result;
 
     case "read_file":
-      return customTrimmed(plan.path);
+    const file = Bun.file(plan.path);
+     if (!(await file.exists())) {
+       return `File not found: ${plan.path}`;
+     }
+     const content = await file.text();
+     return `File: ${plan.path}\n\`\`\`${plan.path.split(".").pop()}\n${content}\n\`\`\``;
 
     case "delete_function":
       return deleteFunction(plan.path, plan.name);

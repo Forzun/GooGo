@@ -1,3 +1,5 @@
+import { getOriginalNode } from "typescript";
+
 export function extractFiles(input: string) {
   const matches = input.match(/@\S+/g) || [];
 

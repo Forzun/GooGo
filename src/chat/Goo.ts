@@ -337,10 +337,10 @@ export class GooChat {
 
                 const renderSuggestions = () => {
                   clearSuggestions();
-                  const mention = getCurrentFileMention(value)
+                  const mention = getCurrentFileMention(value);
 
                   if (mention) {
-                    this.suggestions  = searchFile(mention, this.projectFils) || []
+                    this.suggestions    = searchFile(mention, this.projectFils) || []
                     this.cmdSuggestions = [];
 
                     if (this.suggestions.length > 0) {
@@ -586,7 +586,10 @@ export class GooChat {
                       const spinner = new SimpleSpinner("Thinking...", "zinc");
                       spinner.start("thinking...");
 
-                      const { finalPrompt } = await customTrimmed(trimmed);
+                      const { finalPrompt , userQuestion } = await customTrimmed(trimmed);
+
+                      // searchMemory isn't good until unless we know what to search
+                      // what if user ask normal hi then its a wast of search in memory
 
                       // search memory
                       const memoryBlock = await this.searchMemory(finalPrompt);
@@ -606,6 +609,8 @@ export class GooChat {
                         { role: "user", content: finalPrompt },
                       ];
 
+                      console.log(messageForModels)
+
                       this.pushAssistant("");
 
                       let assistantContent = "";
@@ -615,8 +620,8 @@ export class GooChat {
                         const plan = await Planner(finalPrompt, this.state.plannerModel!);
 
                         if (plan && plan.type !== "answer") {
+                          spinner.stop("");
                           await this.handleToolPlan(plan, finalPrompt);
-                          spinner.stop("done");
                         } else {
                           assistantContent = await this.handleStream(messageForModels, systemMessage.content, spinner);
                         }
@@ -637,9 +642,12 @@ export class GooChat {
                     }
 
                     private async handleToolPlan(plan: any, finalPrompt: string): Promise<void> {
-                       const result = await executePlan(plan, this.state.model, finalPrompt);
+                      const result = await executePlan(plan, this.state.model, finalPrompt);
+
+                     console.log("result ans:", result)
 
                        if (result && typeof result === "object" && "new" in result) {
+                         // code edit — show diff
                          const diffOutput = await renderDiff({
                            path:         plan.path,
                            functionName: plan.name,
@@ -649,11 +657,12 @@ export class GooChat {
                          this.replaceLastAssistant(diffOutput, true);
                        } else if (result && typeof result === "object" && "error" in result) {
                          this.replaceLastAssistant(`❌ ${result.error}`);
+                       } else if (typeof result === "string") {
+                         // read_file, delete, rename — plain string response
+                         this.replaceLastAssistant(result);
                        } else {
-                         this.replaceLastAssistant(
-                           typeof result === "string" ? result : JSON.stringify(result)
-                         );
-                       }
+                         this.replaceLastAssistant("✓ Done");
+                      }
 
                        this.repaint();
                      }
@@ -700,7 +709,7 @@ export class GooChat {
                                memories.map(m => `- ${m.content}`).join("\n");
                            }
                          } catch {}
-                         return "";
+                         return query || ""
                        }
 
                        private async extractAndSave(userMsg: string, aiResponse: string): Promise<void> {

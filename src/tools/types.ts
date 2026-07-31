@@ -13,7 +13,8 @@ type ToolCall =
 
       content: string;
     }
-  | {
+
+    | {
       type: "replace";
 
       path: string;
