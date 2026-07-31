@@ -609,8 +609,6 @@ export class GooChat {
                         { role: "user", content: finalPrompt },
                       ];
 
-                      console.log(messageForModels)
-
                       this.pushAssistant("");
 
                       let assistantContent = "";
@@ -621,7 +619,7 @@ export class GooChat {
 
                         if (plan && plan.type !== "answer") {
                           spinner.stop("");
-                          await this.handleToolPlan(plan, finalPrompt);
+                          await this.handleToolPlan(plan, finalPrompt , spinner);
                         } else {
                           assistantContent = await this.handleStream(messageForModels, systemMessage.content, spinner);
                         }
@@ -641,10 +639,8 @@ export class GooChat {
                       await saveHistory(this.state.messages);
                     }
 
-                    private async handleToolPlan(plan: any, finalPrompt: string): Promise<void> {
+                    private async handleToolPlan(plan: any, finalPrompt: string , spinner: SimpleSpinner): Promise<string> {
                       const result = await executePlan(plan, this.state.model, finalPrompt);
-
-                     console.log("result ans:", result)
 
                        if (result && typeof result === "object" && "new" in result) {
                          // code edit — show diff
@@ -655,13 +651,30 @@ export class GooChat {
                            newCode:      result.new,
                          });
                          this.replaceLastAssistant(diffOutput, true);
+                         this.repaint()
+                         return "";
                        } else if (result && typeof result === "object" && "error" in result) {
                          this.replaceLastAssistant(`❌ ${result.error}`);
+                         this.repaint()
+                         return ""
                        } else if (typeof result === "string") {
-                         // read_file, delete, rename — plain string response
-                         this.replaceLastAssistant(result);
+
+                         const streamMessages: { role: "user" | "assistant" | "system", content: string }[] = [
+                           {
+                             role: "system",
+                             content: `You are Goo, an AI CLI assistant. Answer based on the file content provided.`
+                           },
+                           {
+                             role: "user",
+                             content: `${result}\n\nUser request: ${finalPrompt}`
+                           }
+                         ]
+
+                         return await this.handleStream(streamMessages, "You are Goo, an AI CLI assistant.", spinner)
                        } else {
                          this.replaceLastAssistant("✓ Done");
+                          this.repaint();
+                          return "";
                       }
 
                        this.repaint();
