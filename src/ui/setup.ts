@@ -33,14 +33,23 @@ export async function setupModels(): Promise<{ model: string;  plannerModel: str
   const themeColor = colorMap[color]!;
 
   // normal models selection
-  const model = await select({
-    message: themeColor("Select a model"),
-    choices: ollamaModels.map((m) => ({
-      name: `${themeColor("●")} ${m.name}`,
-      value: m.value,
-    })),
-  });
-
+  let model: string;
+  try {
+    model = await select({
+      message: themeColor("Select a model"),
+      choices: ollamaModels.map((m) => ({
+        name: `${themeColor("●")} ${m.name}`,
+        value: m.value,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ExitPromptError') {
+      console.log('\nPrompt was cancelled.');
+      process.exit(0);
+    } else {
+      throw error;
+    }
+  }
   // pick planner model — suggest small ones at the top
   const RECOMMENDED_SMALL = ["llama3.2", "qwen2.5:1.5b", "qwen2.5:3b", "phi3.5", "gemma2:2b"];
 
@@ -55,10 +64,22 @@ export async function setupModels(): Promise<{ model: string;  plannerModel: str
       .map(m => ({ value: m, name: `${themeColor("●")} ${m}`})),
   ];
 
-  const plannerModel = await select({
-    message: "Select your planner model (used for tool routing — pick something small and fast)",
-    choices: plannerChoices,
-  });
+  let plannerModel: string;
+
+  try {
+     plannerModel = await select({
+      message: "Select your planner model (used for tool routing — pick something small and fast)",
+      choices: plannerChoices,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ExitPromptError') {
+      console.log('\nPrompt was cancelled.');
+      process.exit(0);
+    } else {
+      throw error;
+    }
+
+  }
 
   console.log(`  ✓ Planner model:   ${plannerModel}`);
   console.log(`\n  Tip: change planner anytime with /plannermodel\n`);

@@ -1,8 +1,14 @@
 {
-  "name": "googo",
+  "name": "goo",
+  "version": "1.0.0`",
   "module": "index.ts",
   "type": "module",
-  "private": true,
+  "bin": {
+    "goo": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "commander": "12.1.0"

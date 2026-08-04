@@ -193,7 +193,6 @@ w("\n");
 w("\n");
 
 // status bar label
-
 const customModelWidth = plannerModel!.length + model.length + 5 || 40
 
 const widths = [28, 10, 14, customModelWidth, 0];
