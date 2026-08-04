@@ -32,6 +32,7 @@ export async function setupModels(): Promise<{ model: string;  plannerModel: str
   const color = pickTheme() as keyof typeof colorMap;
   const themeColor = colorMap[color]!;
 
+  // normal models selection
   const model = await select({
     message: themeColor("Select a model"),
     choices: ollamaModels.map((m) => ({
@@ -47,11 +48,11 @@ export async function setupModels(): Promise<{ model: string;  plannerModel: str
     // recommended small models that are installed — show first
     ...installed
       .filter(m => RECOMMENDED_SMALL.some(r => m.startsWith(r)))
-      .map(m => ({ value: m, name: `${m}  ← recommended for planning` })),
+      .map(m => ({ value: m, name: `${themeColor("●")} ${m}  ← recommended for planning` })),
     // rest of installed models
     ...installed
       .filter(m => !RECOMMENDED_SMALL.some(r => m.startsWith(r)))
-      .map(m => ({ value: m, name: m })),
+      .map(m => ({ value: m, name: `${themeColor("●")} ${m}`})),
   ];
 
   const plannerModel = await select({
