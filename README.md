@@ -1,6 +1,6 @@
 <div align="center">
 
-![Image Description](./assests/GooIcon.svg)
+![Image Description](./assets/GooIcon.svg)
 
 ### Goo Cli
 
@@ -22,31 +22,37 @@ Unlike memory systems hidden inside a database, GooGo uses a local Markdown vaul
 
 ## Features
 
-* 🤖 Chat with local Ollama models directly from your terminal
-* ⚡ Built with Bun and TypeScript
-* 🌊 Streaming AI responses
-* 📂 Reference project files using `@filename`
-* 🔎 File search and autocomplete
-* 🛠️ AI-powered function editing
-* ✏️ Function creation and modification
-* 🔄 Function renaming
-* 🗑️ Function deletion
-* 📊 Code diff previews
-* 🧠 Persistent long-term memory
-* 🔍 Semantic memory search using embeddings
-* 🗃️ SQLite-powered vector index
-* 📝 Markdown-based memory vault
-* 🔗 Obsidian-compatible memory storage
-* 🕸️ Explore memories using Obsidian Graph View
-* 🎨 Syntax-highlighted code output
-* 💾 Local conversation history
-* 🔐 Local-first architecture
+* Chat with local Ollama models directly from your terminal
+* Built with Bun and TypeScript
+* Streaming AI responses
+* Reference project files using `@filename`
+* File search and autocomplete
+* AI-powered function editing
+* ️Function creation and modification
+* Function renaming
+* Function deletion
+* Code diff previews
+* Persistent long-term memory
+* SQLite-powered vector index
+* Markdown-based memory vault
+* Obsidian-compatible memory storage
+* Explore memories using Obsidian Graph View
+* Syntax-highlighted code output
+* Local conversation history
 
 ---
 
 # How GooGo Works
 
 At a high level:
+
+<div align="center">
+
+![Image Description](./assets/structure.png)
+
+</div>
+
+
 
 ```text
 You
@@ -216,13 +222,13 @@ nomic-embed-text
 During development, run:
 
 ```bash
-bun run src/index.ts
+bun link
 ```
 
-Depending on your project scripts, you may also be able to use:
+now simply you need to run goo command to use it 
 
 ```bash
-bun run start
+goo 
 ```
 
 GooGo will detect your locally installed Ollama models and ask you to select one.
@@ -433,7 +439,7 @@ To explore your memory:
 ~/.goo/vault
 ```
 
-On Linux, `~` represents your home directory.
+Off Linux, `~` represents your home directory.
 
 For example:
 
@@ -539,6 +545,8 @@ Current focus areas include:
 
 ---
 
+# now you done go and enjoy after this its all about upcoming feature
+
 # Planned npm Installation
 
 In the future, GooGo will be installable globally through npm.
@@ -598,7 +606,12 @@ ollama pull nomic-embed-text
 Then start development:
 
 ```bash
-bun run src/index.ts
+bun link  
+```
+then run goo in your project folder and if ever wanted to change the name you can do via package.json file good lunk 
+
+```bash
+goo
 ```
 
 ---
@@ -667,14 +680,6 @@ You can:
 * Submit a pull request
 * Improve documentation
 * Experiment with the memory architecture
-
----
-
-# License
-
-Add your chosen open-source license here.
-
-MIT is a common option for open-source developer tools, but choose the license that best matches how you want others to use and contribute to GooGo.
 
 ---
 
