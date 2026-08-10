@@ -54,7 +54,7 @@ At a high level:
 
 
 
-```text
+<!--```text
 You
  │
  ▼
@@ -71,7 +71,7 @@ Ollama
  │
  ▼
 Local LLM
-```
+```-->
 
 GooGo uses the Ollama API to communicate with models running locally on your machine.
 
@@ -138,7 +138,7 @@ GooGo lets you use models installed in Ollama.
 For example:
 
 ```bash
-ollama pull qwen2.5-coder:3b
+ollama pull qwen3.6:27b
 ```
 
 You can use another compatible Ollama model if you prefer.
@@ -159,7 +159,17 @@ GooGo's long-term memory system uses a separate embedding model.
 
 The embedding model does **not** generate chat responses.
 
-Instead, it converts memories and questions into numerical vectors so GooGo can perform semantic search and find relevant memories.
+It converts memories and questions into numerical vectors so GooGo can perform semantic search and find relevant memories.
+
+# Here are some recommended embedding models list
+
+```bash
+- ollama pull Qwen3-Embedding-8B
+- ollama pull Qwen3-Embedding-4B
+- ollama pull mxbai-embed-large 
+```
+
+For more check here: https://ollama.com/search?c=embedding
 
 Download the embedding model:
 
@@ -203,6 +213,8 @@ Selected Chat Model
 Response
 ```
 
+this is just how rag work
+
 The chat model and embedding model have different jobs:
 
 ```text
@@ -236,8 +248,8 @@ GooGo will detect your locally installed Ollama models and ask you to select one
 ```text
 ? Select a model
 
-● qwen2.5-coder:3b
-● llama3.1:8b
+● qwen3.6:27b
+● llama3.2:8b
 ● ...
 ```
 
@@ -245,7 +257,7 @@ After selecting a model, you can start chatting.
 
 ---
 
-# Talking About Your Code
+<!--# Talking About Your Code
 
 GooGo can read files from your current project.
 
@@ -392,7 +404,7 @@ This means the SQLite database is disposable.
 If the vector database is deleted, the original Markdown memories still exist and can eventually be re-indexed.
 
 ---
-
+-->
 # Memory Location
 
 By default, GooGo stores its data inside:
@@ -438,8 +450,6 @@ To explore your memory:
 ```text
 ~/.goo/vault
 ```
-
-Off Linux, `~` represents your home directory.
 
 For example:
 
@@ -545,9 +555,9 @@ Current focus areas include:
 
 ---
 
-# now you done go and enjoy after this its all about upcoming feature
+# Now you done goo and enjoy after this its all about upcoming feature
 
-# Planned npm Installation
+<!--# Planned npm Installation
 
 In the future, GooGo will be installable globally through npm.
 
@@ -612,7 +622,7 @@ then run goo in your project folder and if ever wanted to change the name you ca
 
 ```bash
 goo
-```
+```-->
 
 ---
 
@@ -648,22 +658,22 @@ GooGo is still evolving.
 
 Planned ideas include:
 
-* [ ] Improved code editing agent
+* [x] Improved code editing agent
 * [ ] Multi-step autonomous tool calling
-* [ ] Memory Manager
-* [ ] Automatic memory retrieval
-* [ ] Automatic memory indexing
-* [ ] Markdown chunking
-* [ ] `goo memory rebuild`
-* [ ] Obsidian relationship generation
+* [x] Memory Manager
+* [x] Automatic memory retrieval
+* [x] Automatic memory indexing
+* [x] Markdown chunking
+* [x] `goo memory rebuild`
+* [x] Obsidian relationship generation
 * [ ] Knowledge graph expansion
-* [ ] Git-aware context
-* [ ] Terminal command tools
+* [x] Git-aware context
+* [x] Terminal command tools
 * [ ] Project indexing
 * [ ] MCP support
 * [ ] Plugin system
 * [ ] Global npm/Bun installation
-* [ ] More local model providers
+* [x] More local model providers
 
 ---
 
