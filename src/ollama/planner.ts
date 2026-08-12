@@ -1,8 +1,6 @@
-import { getEffectiveTypeRoots, isThrowStatement } from "typescript";
 import { createFunction } from "../tools/create-function";
 import { deleteFunction } from "../tools/delete-function";
 import { editFunction } from "../tools/edit-function";
-import { customTrimmed } from "../tools/read-file";
 import { renameFunction } from "../tools/rename-function";
 import { replaceBlock } from "../tools/replace-block";
 import { chat } from "./chat";

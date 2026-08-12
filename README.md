@@ -183,38 +183,6 @@ Make sure it appears in:
 ollama list
 ```
 
-The architecture looks like this:
-
-```text
-User Question
-      │
-      ▼
-nomic-embed-text
-      │
-      ▼
-Query Vector
-      │
-      ▼
-SQLite Vector Search
-      │
-      ▼
-Relevant Memory
-      │
-      ▼
-Markdown Vault
-      │
-      ▼
-Relevant Context
-      │
-      ▼
-Selected Chat Model
-      │
-      ▼
-Response
-```
-
-this is just how rag work
-
 The chat model and embedding model have different jobs:
 
 ```text
@@ -433,8 +401,6 @@ The structure looks roughly like:
 
 The `vault` directory contains the human-readable Markdown memory.
 
-The `vector.db` file contains the SQLite search index.
-
 ---
 
 # Open GooGo Memory in Obsidian
@@ -472,7 +438,7 @@ After opening:
 as an Obsidian vault, open **Graph View**.
 
 As GooGo's memory system grows and notes begin using Obsidian links such as:
-
+<!--
 ```text
 [[GooGo]]
 [[Ollama]]
@@ -490,7 +456,7 @@ you will be able to visually explore relationships between:
             \      |      /
              \     |     /
               TypeScript
-```
+```-->
 
 The long-term goal is to combine:
 
@@ -507,175 +473,7 @@ This allows GooGo's memory to remain both **machine-searchable** and **human-rea
 
 ---
 
-# Memory Privacy
-
-GooGo's memory is stored locally on your machine.
-
-Your vault lives inside:
-
-```text
-~/.goo/vault
-```
-
-You can:
-
-* Read your memories
-* Edit them
-* Delete them
-* Back them up
-* Version-control them
-* Open them in Obsidian
-
-The goal is simple:
-
-> Your AI memory should belong to you.
-
----
-
-# Current Project Status
-
-GooGo is currently experimental and under active development.
-
-Some features may be incomplete or change significantly.
-
-Current focus areas include:
-
-* Improving AI code editing
-* Multi-step tool execution
-* Better memory extraction
-* Memory retrieval and context injection
-* Markdown chunking
-* Automatic vault indexing
-* Obsidian knowledge graphs
-* Memory re-indexing
-* Better terminal UI
-* Git integration
-* Project-aware context
-* Safer code modifications
-
----
-
 # Now you done goo and enjoy after this its all about upcoming feature
-
-<!--# Planned npm Installation
-
-In the future, GooGo will be installable globally through npm.
-
-The planned experience will look something like:
-
-```bash
-npm install -g googo
-```
-
-or:
-
-```bash
-bun install -g googo
-```
-
-Then you will be able to enter any project:
-
-```bash
-cd my-project
-```
-
-and launch GooGo directly:
-
-```bash
-goo
-```
-
-For now, install GooGo by cloning the GitHub repository.
-
----
-
-# Development
-
-Clone the project:
-
-```bash
-git clone https://github.com/Forzun/GooGo.git
-```
-
-Install dependencies:
-
-```bash
-cd GooGo
-
-bun install
-```
-
-Make sure Ollama is running and required models are installed:
-
-```bash
-ollama pull qwen2.5-coder:3b
-
-ollama pull nomic-embed-text
-```
-
-Then start development:
-
-```bash
-bun link  
-```
-then run goo in your project folder and if ever wanted to change the name you can do via package.json file good lunk 
-
-```bash
-goo
-```-->
-
----
-
-# Philosophy
-
-GooGo is built around a few ideas:
-
-### Local First
-
-Run models locally through Ollama whenever possible.
-
-### User-Owned Memory
-
-Long-term memory should live in files you can inspect and control.
-
-### Transparent Context
-
-You should be able to understand what your AI remembers.
-
-### Controlled Tools
-
-AI should modify code through explicit tools instead of unrestricted file manipulation.
-
-### Open Source
-
-Anyone should be able to clone GooGo, understand how it works, modify it, and run their own version.
-
----
-
-# Roadmap
-
-GooGo is still evolving.
-
-Planned ideas include:
-
-* [x] Improved code editing agent
-* [ ] Multi-step autonomous tool calling
-* [x] Memory Manager
-* [x] Automatic memory retrieval
-* [x] Automatic memory indexing
-* [x] Markdown chunking
-* [x] `goo memory rebuild`
-* [x] Obsidian relationship generation
-* [ ] Knowledge graph expansion
-* [x] Git-aware context
-* [x] Terminal command tools
-* [ ] Project indexing
-* [ ] MCP support
-* [ ] Plugin system
-* [ ] Global npm/Bun installation
-* [x] More local model providers
-
----
 
 # Contributing
 

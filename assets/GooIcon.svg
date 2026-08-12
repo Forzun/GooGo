@@ -3,10 +3,10 @@
     .cls-0 {fill:#FB8B50;}
     .cls-1 {opacity:6.000000e-02;}
   </style>
-  
+
   <!-- G -->
   <path class="cls-0" d="m46.4 10.5v-10.5h-27.4v10.5h-5.7v10.6h-5.6v31.1 4.6h5.7v6.2h5.6v10.6h27.8l0.9-0.1v-10.4h4.5v-31.7h-20.4v10.9h-0.1v0.3h7.7v19.6h-13.8v-10.6h-5.8v-29.2h5.8v-11h14v10.7h12.6v-11.6"/>
-  
+
   <!-- oo — shifted right by 18 units -->
   <g class="cls-1" transform="translate(18, 0)">
     <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
