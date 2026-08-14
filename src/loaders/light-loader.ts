@@ -194,7 +194,7 @@ export class SimpleSpinner {
 
   stop(message = "Done") {
     if (this.spinTimer) { clearInterval(this.spinTimer); this.spinTimer = null; }
-    process.stdout.write(`${CLEAR}${this.theme.spinner}✓${RESET} ${message}\n${SHOW}`);
+    process.stdout.write(`${CLEAR}${this.theme.spinner}${RESET} ${message}\n${SHOW}`);
   }
 }
 

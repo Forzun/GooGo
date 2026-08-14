@@ -109,18 +109,19 @@ export function loadingAnimation(): boolean {
   return true;
 }
 
-export function loaderFunction(): string[] {
-  const startTime = performance.now();
-  const loadingTexts: string[] = [];
-  for (let i = 0; i < 20; i++) {
-    const text = "\rLoading...";
-    process.stdout.write(text);
-    loadingTexts.push(text);
-  }
-  console.log(`\nDone! (Loaded in ${performance.now() - startTime}ms)`);
-  return loadingTexts;
-}
-
 export function countTwoNumbers(a: number, b: number): number {
   return a + b;
+}
+
+export function sumTo(a: number, b: number): number {
+  return a + b;
+}
+
+export function threeSum(a: number, b: number, c: number): number {
+  return a + b + c;
+}
+
+export function loader(): string[] {
+  const loadingMessage = ["Loading...", "Please wait...", "Almost there..."];
+  return loadingMessage;
 }

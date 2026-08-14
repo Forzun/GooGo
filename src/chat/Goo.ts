@@ -1,4 +1,3 @@
-
 import { execSync } from "child_process";
 import { chatResponseStream } from "../ollama/chat";
 import { GooLoader } from "../loaders/progress";
@@ -27,7 +26,6 @@ import { extractedMemory } from "../memory/extract";
 import { Database } from "bun:sqlite"
 import { DB_PATH, initVault } from "../memory/init";
 import { getInstalledModels } from "../ui/setup";
-import { parseCommandLine } from "typescript";
 
 const R = "\x1b[0m";
 const HIDE = "\x3b[?25l";
@@ -639,16 +637,20 @@ await saveHistory(this.state.messages);
 }
 
 private async handleToolPlan(plan: any, finalPrompt: string , spinner: SimpleSpinner): Promise<string> {
+spinner.start(' ')
 const result = await executePlan(plan, this.state.model, finalPrompt);
+spinner.stop(' ')
 
 if (result && typeof result === "object" && "new" in result) {
 // code edit — show diff
+
 const diffOutput = await renderDiff({
 path:         plan.path,
 functionName: plan.name,
 oldCode:      "old" in result ? result.old : null,
 newCode:      result.new,
 });
+
 this.replaceLastAssistant(diffOutput, true);
 this.repaint()
 return "";
@@ -669,6 +671,7 @@ content: `${result}\n\nUser request: ${finalPrompt}`
 }
 ]
 
+spinner.start(' ')
 return await this.handleStream(streamMessages, "You are Goo, an AI CLI assistant.", spinner)
 } else {
 this.replaceLastAssistant("✓ Done");
@@ -676,6 +679,7 @@ this.repaint();
 return "";
 }
 
+spinner.stop(' ')
 this.repaint();
 }
 
@@ -707,8 +711,8 @@ process.stdout.write(token);
 
 if (!spinnerStopped) spinner.stop("");
 
-console.log("\n");
 this.repaint();
+spinner.stop(' ')
 
 return content;
 }
