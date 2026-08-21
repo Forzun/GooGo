@@ -6,9 +6,7 @@
 
 </div>
 
-
-
-![Watch Demo](./assets/GooCli_Demo.mp4)   
+[![Watch the video](./assets/frontCover.jpeg)](https://drive.google.com/file/d/1_TsTRvLSO1phmD0WINaiWHhu9jgoaHI5/view?usp=sharing)
 
 # GooGo
 
