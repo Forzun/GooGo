@@ -6,6 +6,10 @@
 
 </div>
 
+
+
+![Watch Demo](./assets/GooCli_Demo.mp4)   
+
 # GooGo
 
 > A local-first, open-source AI coding assistant for your terminal — powered by Ollama, with file-aware conversations, code editing, and persistent memory you actually own.

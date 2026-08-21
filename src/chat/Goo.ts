@@ -679,8 +679,6 @@ this.repaint();
 return "";
 }
 
-spinner.stop(' ')
-this.repaint();
 }
 
 private async handleStream(
@@ -701,7 +699,7 @@ let spinnerStopped = false;
 
 for await (const token of stream) {
 if (!spinnerStopped) {
-spinner.stop("");
+spinner.stop(" ")
 spinnerStopped = true;
 }
 content += token;
@@ -711,8 +709,8 @@ process.stdout.write(token);
 
 if (!spinnerStopped) spinner.stop("");
 
+this.replaceLastAssistant(content)
 this.repaint();
-spinner.stop(' ')
 
 return content;
 }
