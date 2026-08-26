@@ -26,6 +26,7 @@ import { extractedMemory } from "../memory/extract";
 import { Database } from "bun:sqlite"
 import { DB_PATH, initVault } from "../memory/init";
 import { getInstalledModels } from "../ui/setup";
+import { StepRunner } from "../loaders/steps";
 
 const R = "\x1b[0m";
 const HIDE = "\x3b[?25l";
@@ -577,144 +578,180 @@ private async handleExit(): Promise<void> {
   console.log("👋 Goodbye!");
 }
 
-// ── message handling ─────────────────────────────────────────────────────────
 private async handleUserMessage(trimmed: string): Promise<void> {
-const spinner = new SimpleSpinner("Thinking...", "zinc");
-spinner.start("thinking...");
+  // ── boot spinner (thinking / memory search) ─────────────────────────────
+  const spinner = new SimpleSpinner("thinking...", "zinc");
+  spinner.start("thinking...");
 
-const { finalPrompt , userQuestion } = await customTrimmed(trimmed);
+  const { finalPrompt, userQuestion } = await customTrimmed(trimmed);
 
-// searchMemory isn't good until unless we know what to search
-// what if user ask normal hi then its a wast of search in memory
+  const memoryBlock = await this.searchMemory(finalPrompt);
+  spinner.setLabel("searching memory...");
 
-// search memory
-const memoryBlock = await this.searchMemory(finalPrompt);
-spinner.setLabel("searching...");
+  this.pushUser(trimmed);
+  this.repaint();
 
-this.pushUser(trimmed);
-this.repaint();
+  const systemMessage = {
+    role: "system" as const,
+    content: `You are Goo, an AI CLI assistant.${memoryBlock}`,
+  };
 
-const systemMessage = {
-  role: "system" as const,
-  content: `You are Goo, an AI CLI assistant.${memoryBlock}`,
-};
+  const messageForModels: { role: "user" | "assistant" | "system"; content: string }[] = [
+    systemMessage,
+    ...this.state.messages.slice(0, -1),
+    { role: "user", content: finalPrompt },
+  ];
 
-const messageForModels: { role: "user" | "assistant" | "system"; content: string }[] = [
-  systemMessage,
-  ...this.state.messages.slice(0, -1),
-  { role: "user", content: finalPrompt },
-];
+  this.pushAssistant("");
 
-this.pushAssistant("");
+  let assistantContent = "";
 
-let assistantContent = "";
+  try {
+    spinner.setLabel("planning...");
+    const plan = await Planner(finalPrompt, this.state.plannerModel!);
 
-try {
-spinner.setLabel("Planning...");
-const plan = await Planner(finalPrompt, this.state.plannerModel!);
+    if (plan && plan.type !== "answer") {
+      // ── hand off to tool plan — spinner stops here, StepRunner takes over
+      spinner.stop("");
+      assistantContent = await this.handleToolPlan(plan, finalPrompt, spinner);
+    } else {
+      // ── direct stream answer
+      assistantContent = await this.handleStream(messageForModels, systemMessage.content, spinner);
+    }
+  } catch (error) {
+    spinner.stop("");
+    this.replaceLastAssistant(
+      "❌ Error: " + (error instanceof Error ? error.message : String(error))
+    );
+    this.repaint();
+  }
 
-if (plan && plan.type !== "answer") {
-spinner.stop("");
-await this.handleToolPlan(plan, finalPrompt , spinner);
-} else {
-assistantContent = await this.handleStream(messageForModels, systemMessage.content, spinner);
-}
-} catch (error) {
-spinner.stop("");
-this.replaceLastAssistant(
-"❌ Error: " + (error instanceof Error ? error.message : String(error))
-);
-this.repaint();
-}
+  if (assistantContent) {
+    void this.extractAndSave(trimmed, assistantContent);
+  }
 
-// extract and save memories in background — don't block UI
-if (assistantContent) {
-void this.extractAndSave(trimmed, assistantContent);
-}
-
-await saveHistory(this.state.messages);
+  await saveHistory(this.state.messages);
 }
 
-private async handleToolPlan(plan: any, finalPrompt: string , spinner: SimpleSpinner): Promise<string> {
-spinner.start(' ')
-const result = await executePlan(plan, this.state.model, finalPrompt);
-spinner.stop(' ')
+private async handleToolPlan(
+  plan: any,
+  finalPrompt: string,
+  spinner: SimpleSpinner
+): Promise<string> {
+  // ── StepRunner replaces spinner for tool execution ──────────────────────
+  // Steps are revealed one by one as we progress through the plan.
+  const steps = new StepRunner([
+    "Planning",
+    "Executing",
+    "Finishing up",
+  ]);
 
-if (result && typeof result === "object" && "new" in result) {
-// code edit — show diff
+  steps.start("reading plan...");
 
-const diffOutput = await renderDiff({
-path:         plan.path,
-functionName: plan.name,
-oldCode:      "old" in result ? result.old : null,
-newCode:      result.new,
-});
+  const result = await executePlan(plan, this.state.model, finalPrompt);
 
-this.replaceLastAssistant(diffOutput, true);
-this.repaint()
-return "";
-} else if (result && typeof result === "object" && "error" in result) {
-this.replaceLastAssistant(`❌ ${result.error}`);
-this.repaint()
-return ""
-} else if (typeof result === "string") {
+  if (result && typeof result === "object" && "new" in result) {
+    // ── code edit → show diff ─────────────────────────────────────────────
+    steps.next("rendering diff...");
+    const diffOutput = await renderDiff({
+      path:         plan.path,
+      functionName: plan.name,
+      oldCode:      "old" in result ? result.old : null,
+      newCode:      result.new,
+    });
+    steps.finish("done");
+    this.replaceLastAssistant(diffOutput, true);
+    this.repaint();
+    return "";
 
-const streamMessages: { role: "user" | "assistant" | "system", content: string }[] = [
-{
-role: "system",
-content: `You are Goo, an AI CLI assistant. Answer based on the file content provided.`
-},
-{
-role: "user",
-content: `${result}\n\nUser request: ${finalPrompt}`
-}
-]
+  } else if (result && typeof result === "object" && "error" in result) {
+    // ── execution error ───────────────────────────────────────────────────
+    steps.fail(result.error as string);
+    this.replaceLastAssistant(`❌ ${result.error}`);
+    this.repaint();
+    return "";
 
-spinner.start(' ')
-return await this.handleStream(streamMessages, "You are Goo, an AI CLI assistant.", spinner)
-} else {
-this.replaceLastAssistant("✓ Done");
-this.repaint();
-return "";
-}
+  } else if (typeof result === "string") {
+    // ── tool returned context — stream a response using it ────────────────
+    steps.next("streaming response...");
 
+    const streamMessages: { role: "user" | "assistant" | "system"; content: string }[] = [
+      {
+        role: "system",
+        content: "You are Goo, an AI CLI assistant. Answer based on the file content provided.",
+      },
+      {
+        role: "user",
+        content: `${result}\n\nUser request: ${finalPrompt}`,
+      },
+    ];
+
+    // pass steps so handleStream can call steps.finish() when done
+    return await this.handleStream(
+      streamMessages,
+      "You are Goo, an AI CLI assistant.",
+      spinner,
+      steps
+    );
+
+  } else {
+    // ── plan had no meaningful output ─────────────────────────────────────
+    steps.finish("done");
+    this.replaceLastAssistant("✓ Done");
+    this.repaint();
+    return "";
+  }
 }
 
 private async handleStream(
-messages: { role: "user" | "assistant" | "system"; content: string }[],
-system: string,
-spinner: SimpleSpinner
+  messages: { role: "user" | "assistant" | "system"; content: string }[],
+  system: string,
+  spinner: SimpleSpinner,
+  steps?: StepRunner
 ): Promise<string> {
-spinner.setLabel("Generating response...");
+  // if StepRunner was passed, advance it to "generating" step
+  // otherwise fall back to spinner label
+  if (steps) {
+    steps.next("generating response...");
+  } else {
+    spinner.setLabel("generating response...");
+  }
 
-const stream = await chatResponseStream({
-messages,
-model: this.state.model,
-system,
-});
+  const stream = await chatResponseStream({
+    messages,
+    model:  this.state.model,
+    system,
+  });
 
-let content = "";
-let spinnerStopped = false;
+  let content         = "";
+  let spinnerStopped  = false;
 
-for await (const token of stream) {
-if (!spinnerStopped) {
-spinner.stop(" ")
-spinnerStopped = true;
-}
-content += token;
-this.replaceLastAssistant(content);
-process.stdout.write(token);
-}
+  for await (const token of stream) {
+    // stop whichever loader is active on first token
+    if (!spinnerStopped) {
+      if (steps) {
+        steps.finish("done");
+      } else {
+        spinner.stop("");
+      }
+      spinnerStopped = true;
+    }
 
-if (!spinnerStopped) spinner.stop("");
+    content += token;
+    this.replaceLastAssistant(content);
+    process.stdout.write(token);
+  }
 
-this.replaceLastAssistant(content)
-this.repaint();
+  // guard: if stream was empty, still stop the loader
+  if (!spinnerStopped) {
+    if (steps) steps.finish("done");
+    else        spinner.stop("");
+  }
 
-return content;
-}
-
-private async searchMemory(query: string): Promise<string> {
+  this.replaceLastAssistant(content);
+  this.repaint();
+  return content;
+}private async searchMemory(query: string): Promise<string> {
 try {
 const memories = await searchMemories(query, 5);
 if (memories.length > 0) {
