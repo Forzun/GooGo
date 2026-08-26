@@ -32,3 +32,6 @@ if (options.debug) {
   console.log("Debug mode is enabled");
   console.log("Options:", options);
 }
+
+
+

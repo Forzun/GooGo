@@ -38,8 +38,7 @@ const bg = (r: number, g: number, b: number) => `\x1b[48;2;${r};${g};${b}m`;
 const SUGG_CMD = "\x1b[38;2;70;70;78m"; // dim purple-gray for command
 const SUGG_DESC = "\x1b[38;2;55;55;62m"; // even dimmer for description
 const TEXT = fg(228, 228, 231);
-const MUTED = fg(161, 161, 171);
-const DIM = fg(113, 113, 122);
+const MUTED = fg(161, 161, 171); const DIM = fg(113, 113, 122);
 const WARN = fg(251, 146, 60);
 const OK = fg(134, 239, 172);
 const HINT = fg(74, 222, 128);

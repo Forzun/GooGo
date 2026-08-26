@@ -54,7 +54,7 @@ function logoRow(
   rowIndex: number,
   theme: ReturnType<typeof pickTheme>,
 ): string {
-  const { bright, dim } = THEMES[theme];
+  const { bright, dim } = THEMES[theme!];
   const fill = rowIndex % 2 === 0 ? bright : dim;
   const cells = bits.map((b) => (b ? `${fill}▉${R}` : " ")).join("");
   return `  ${cells}`;
@@ -90,7 +90,7 @@ export function printWelcome(opts: WelcomeOptions = {}) {
   } = opts;
 
   const theme = logoTheme === "random" ? pickTheme() : logoTheme;
-  const { accent } = THEMES[theme];
+  const { accent } = THEMES[theme!];
 
   const pad = "    ";
   const textRows: Record<number, string> = {
