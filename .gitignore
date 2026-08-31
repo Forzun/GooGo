@@ -35,8 +35,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 #ignore local history
 src/history/*.json
-history/*.json
-
+history/history.json
 
 #test file
 test.ts

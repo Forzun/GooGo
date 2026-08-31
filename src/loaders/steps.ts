@@ -1,4 +1,4 @@
-const HIDE = "\x1b[?25l";
+const HIDE = "\x2b[?25l";
 const SHOW = "\x1b[?25h";
 const R    = "\x1b[0m";
 const UP   = (n: number) => `\x1b[${n}A`;
@@ -7,7 +7,6 @@ const CLR  = "\r\x1b[2K";
 const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
 
 // ── Pure zinc palette ─────────────────────────────────────────────────────────
-const Z900 = fg( 24,  24,  27);
 const Z700 = fg( 63,  63,  70);
 const Z500 = fg(113, 113, 122);
 const Z400 = fg(161, 161, 170);
@@ -20,13 +19,31 @@ const AMBER = fg(252, 211,  77);
 
 const SPIN_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
 
-// Fade-out sequence: bright → settled dim (6 steps, ~480ms total)
-const FADEOUT_COLORS = [Z50, Z200, Z400, Z500, Z700, Z400];
-const FADEOUT_STEPS  = FADEOUT_COLORS.length;
+// ── Glow pulse: sine wave over zinc colors ────────────────────────────────────
+// 12 steps = one full breath cycle (~960ms at 80ms/frame)
+const GLOW_CYCLE = [
+  fg(228, 228, 231),  // Z200  peak bright
+  fg(220, 220, 224),
+  fg(200, 200, 207),
+  fg(180, 180, 188),
+  fg(161, 161, 170),  // Z400  mid
+  fg(140, 140, 150),
+  fg(120, 120, 130),
+  fg(113, 113, 122),  // Z500  dim trough
+  fg(120, 120, 130),
+  fg(140, 140, 150),
+  fg(161, 161, 170),  // Z400  rising again
+  fg(200, 200, 207),
+];
+const GLOW_LEN = GLOW_CYCLE.length;
 
-// Fade-in sequence for new step reveal: dark → bright (4 steps)
-const FADEIN_COLORS  = [Z700, Z500, Z400, Z200];
-const FADEIN_STEPS   = FADEIN_COLORS.length;
+// ── Fade-out when step completes ──────────────────────────────────────────────
+const FADEOUT = [Z50, Z200, Z400, Z500, Z700, Z400];
+const FADEOUT_LEN = FADEOUT.length;
+
+// ── Slide+fade in when step first appears ─────────────────────────────────────
+const FADEIN = [Z700, Z500, Z400, Z200];
+const FADEIN_LEN = FADEIN.length;
 
 type StepStatus = "pending" | "running" | "done" | "error";
 
@@ -35,29 +52,28 @@ interface Step {
   status:      StepStatus;
   detail?:     string;
   revealed:    boolean;
-  revealFrame: number;   // frame when this step was revealed
-  doneFrame:   number;   // frame when this step became done/error
-  detailFrame: number;   // frame when detail text last changed
+  revealFrame: number;
+  doneFrame:   number;
+  detailFrame: number;
 }
 
 function renderStep(step: Step, frame: number): string {
   if (!step.revealed) return "";
 
-  const revealAge = frame - step.revealFrame;  // how long since appeared
-  const doneAge   = frame - step.doneFrame;    // how long since marked done
+  const revealAge = frame - step.revealFrame;
+  const doneAge   = frame - step.doneFrame;
 
-  // ── icon ─────────────────────────────────────────────────────────────────
+  // ── icon ──────────────────────────────────────────────────────────────────
   let icon: string;
   switch (step.status) {
     case "done": {
-      // brief bright pop on the ✓ right when it flips, then settles to GREEN
-      const popColor = doneAge < 2 ? Z50 : GREEN;
-      icon = `${popColor}✓${R}`;
+      const c = doneAge < 2 ? Z50 : GREEN;
+      icon = `${c}✓${R}`;
       break;
     }
     case "error": {
-      const popColor = doneAge < 2 ? Z50 : RED;
-      icon = `${popColor}✗${R}`;
+      const c = doneAge < 2 ? Z50 : RED;
+      icon = `${c}✗${R}`;
       break;
     }
     case "running":
@@ -70,25 +86,21 @@ function renderStep(step: Step, frame: number): string {
   // ── label color ───────────────────────────────────────────────────────────
   let labelColor: string;
 
-  if (step.status === "done") {
-    // smooth fade-out: walk through FADEOUT_COLORS then settle at Z400
-    if (doneAge < FADEOUT_STEPS) {
-      labelColor = FADEOUT_COLORS[doneAge]!;
+  if (step.status === "running") {
+    if (revealAge < FADEIN_LEN) {
+      // fade-in first, then glow
+      labelColor = FADEIN[revealAge]!;
     } else {
-      labelColor = Z400;
+      // glow pulse — breathe in/out forever while running
+      labelColor = GLOW_CYCLE[frame % GLOW_LEN]!;
     }
+  } else if (step.status === "done") {
+    labelColor = doneAge < FADEOUT_LEN ? FADEOUT[doneAge]! : Z400;
   } else if (step.status === "error") {
     labelColor = doneAge < 2 ? Z50 : Z500;
-  } else if (step.status === "running") {
-    // fade-in on first reveal
-    if (revealAge < FADEIN_STEPS) {
-      labelColor = FADEIN_COLORS[revealAge]!;
-    } else {
-      labelColor = Z200;
-    }
   } else {
-    // pending — fade in dimly
-    labelColor = revealAge < FADEIN_STEPS ? (FADEIN_COLORS[Math.min(revealAge, 1)]!) : Z500;
+    // pending: slide in dimly
+    labelColor = revealAge < FADEIN_LEN ? FADEIN[Math.min(revealAge, 1)]! : Z500;
   }
 
   const label = `${labelColor}${step.label}${R}`;
@@ -96,14 +108,14 @@ function renderStep(step: Step, frame: number): string {
   // ── detail ────────────────────────────────────────────────────────────────
   let detail = "";
   if (step.detail && (step.status === "running" || step.status === "done" || step.status === "error")) {
-    const detailAge = frame - step.detailFrame;
-    const detailColor = detailAge < FADEIN_STEPS
-      ? (FADEIN_COLORS[Math.min(detailAge, FADEIN_STEPS - 1)]!)
+    const detailAge   = frame - step.detailFrame;
+    const detailColor = detailAge < FADEIN_LEN
+      ? FADEIN[Math.min(detailAge, FADEIN_LEN - 1)]!
       : Z500;
     detail = `  ${detailColor}${step.detail}${R}`;
   }
 
-  // ── slide-in on reveal (shift left over 3 frames) ─────────────────────────
+  // ── slide-in on reveal ────────────────────────────────────────────────────
   const slide = revealAge < 3 ? " ".repeat(3 - revealAge) : "";
 
   const lBr = `${Z700}[${R}`;
@@ -119,7 +131,7 @@ export class StepRunner {
   private frame   = 0;
   private drawn   = 0;
 
-  private readonly STAGGER_TICKS = 5;  // ~400ms between each step appearing
+  private readonly STAGGER_TICKS = 5;
   private nextRevealAt = 0;
   private revealIdx    = 0;
 
@@ -135,7 +147,6 @@ export class StepRunner {
   }
 
   private render() {
-    // reveal next step on schedule
     if (this.revealIdx < this.steps.length && this.frame >= this.nextRevealAt) {
       const s       = this.steps[this.revealIdx]!;
       s.revealed    = true;
@@ -158,8 +169,6 @@ export class StepRunner {
     this.frame++;
   }
 
-  // ── public API ────────────────────────────────────────────────────────────
-
   start(detail?: string) {
     if (detail && this.steps[0]) {
       this.steps[0].detail      = detail;
@@ -176,13 +185,12 @@ export class StepRunner {
     if (running) {
       running.status    = "done";
       running.detail    = undefined;
-      running.doneFrame = this.frame;   // ← triggers fade-out animation
+      running.doneFrame = this.frame;
     }
-
     const nextStep = this.steps.find((s) => s.status === "pending" && s.revealed);
     if (nextStep) {
       nextStep.status      = "running";
-      nextStep.revealFrame = this.frame; // reset so fade-in plays from now
+      nextStep.revealFrame = this.frame;
       if (detail) {
         nextStep.detail      = detail;
         nextStep.detailFrame = this.frame;
